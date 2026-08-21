@@ -122,6 +122,12 @@ export const AuthProvider = ({ children }) => {
     reduxDispatch(logoutSuccess());
   };
 
+  const updateUser = (updatedFields) => {
+    const newUser = { ...user, ...updatedFields };
+    setUser(newUser);
+    reduxDispatch(loginSuccess({ user: newUser, token }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -130,7 +136,8 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         login,
         register,
-        logout
+        logout,
+        updateUser
       }}
     >
       {children}

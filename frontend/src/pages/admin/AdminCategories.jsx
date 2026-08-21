@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AdminPagination from '../../components/admin/AdminPagination.jsx';
 
 const AdminCategories = () => {
   const { token } = useAuth();
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,11 +29,11 @@ const AdminCategories = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch Categories
-  const fetchCategories = async () => {
+  const fetchCategories = async (page = 1) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/category/list.php', {
+      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/category/list.php?page=${page}&limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -35,6 +41,11 @@ const AdminCategories = () => {
       const result = await response.json();
       if (result.status) {
         setCategories(result.data.categories);
+        if (result.data.pagination) {
+          setCurrentPage(result.data.pagination.page);
+          setTotalPages(result.data.pagination.total_pages);
+          setTotalRecords(result.data.pagination.total_records);
+        }
       } else {
         setError(result.message || 'Failed to fetch categories');
       }
@@ -46,7 +57,7 @@ const AdminCategories = () => {
   };
 
   useEffect(() => {
-    fetchCategories();
+    fetchCategories(1);
   }, [token]);
 
   // Handle Input Changes
@@ -131,7 +142,7 @@ const AdminCategories = () => {
       
       if (result.status) {
         closeModal();
-        fetchCategories(); 
+        fetchCategories(currentPage); 
       } else {
         setError(result.message || 'Operation failed');
       }
@@ -245,6 +256,19 @@ const AdminCategories = () => {
             </table>
           </div>
         )}
+        
+        {!isLoading && totalPages > 1 && (
+          <div className="admin-pagination-wrapper">
+            <div className="admin-pagination-info">
+              Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalRecords)} of {totalRecords} categories
+            </div>
+            <AdminPagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => fetchCategories(page)}
+            />
+          </div>
+        )}
       </div>
 
       {isModalOpen && (
@@ -275,7 +299,7 @@ const AdminCategories = () => {
                     <img 
                       src={`http://localhost/vivisha_boutique/backend/${formData.imageUrl}`} 
                       alt={formData.name} 
-                      style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '50%', border: '4px solid #fdf2f8', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                      style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #F6EDF6' }}
                     />
                   ) : (
                     <div style={{ width: '120px', height: '120px', backgroundColor: '#f3f4f6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', border: '4px solid #fdf2f8', fontSize: '0.875rem', fontWeight: '500' }}>No Image</div>

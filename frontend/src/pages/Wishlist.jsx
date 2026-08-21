@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext.jsx';
+import { useCart } from '../context/CartContext.jsx';
+
+const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
 
 const Wishlist = () => {
   const navigate = useNavigate();
-  const { wishlistItems, removeFromWishlist, clearWishlist } = useWishlist();
+  const { wishlistItems, removeFromWishlist, isLoading } = useWishlist();
+  const { addToCart } = useCart();
   const [notification, setNotification] = useState('');
 
   const showNotification = (msg) => {
@@ -12,22 +16,28 @@ const Wishlist = () => {
     setTimeout(() => setNotification(''), 3000);
   };
 
-  const handleRemoveFromWishlist = (id, name) => {
-    removeFromWishlist(id);
-    showNotification(`Removed "${name}" from wishlist.`);
+  const handleRemoveFromWishlist = async (item) => {
+    const success = await removeFromWishlist(item.id);
+    if (success) {
+      showNotification(`Removed "${item.product.name}" from wishlist.`);
+    }
   };
 
-  const handleClearWishlist = () => {
-    clearWishlist();
-    showNotification('Wishlist cleared.');
+  const handleAddToCart = (item) => {
+    const sellPrice = parseFloat(item.variant.pricing.selling_price);
+    const cartItem = {
+      id: item.product.id,
+      name: item.product.name,
+      price: sellPrice,
+      image: item.variant.primary_image ? ASSET_BASE_URL + item.variant.primary_image.image : '',
+      variantId: item.variant.id
+    };
+    addToCart(cartItem, 1);
+    showNotification(`Added "${item.product.name}" to cart!`);
   };
 
-  const handleAddToCart = (product) => {
-    showNotification(`Added "${product.name}" to cart!`);
-  };
-
-  const handleBuyNow = (product) => {
-    navigate(`/product/${product.id}`);
+  const handleBuyNow = (item) => {
+    navigate(`/product/${item.variant.id}`);
   };
 
   const handleNavigateToCollections = () => {
@@ -51,16 +61,16 @@ const Wishlist = () => {
           </div>
           <div className="wishlist-title-row">
             <h1 className="wishlist-main-heading">My Wishlist</h1>
-
           </div>
         </div>
       </div>
 
       <div className="container wishlist-body-content">
-        {wishlistItems.length === 0 ? (
-          /* ---------------------------------------------------- */
-          /* Empty Wishlist State                                  */
-          /* ---------------------------------------------------- */
+        {isLoading ? (
+          <div className="empty-wishlist-box">
+             <p>Loading your wishlist...</p>
+          </div>
+        ) : wishlistItems.length === 0 ? (
           <div className="empty-wishlist-box">
             <div className="empty-wishlist-icon-wrapper">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -79,28 +89,26 @@ const Wishlist = () => {
             </button>
           </div>
         ) : (
-          /* ---------------------------------------------------- */
-          /* Wishlist Grid with Products                          */
-          /* ---------------------------------------------------- */
           <div className="wishlist-products-section">
-
-
             <div className="wishlist-grid">
-              {wishlistItems.map((product) => {
-                const discount = Math.round(
-                  ((product.originalPrice - product.price) / product.originalPrice) * 100
-                );
+              {wishlistItems.map((item) => {
+                const sellPrice = parseFloat(item.variant.pricing.selling_price);
+                const origPrice = parseFloat(item.variant.pricing.original_price);
+                const hasDiscount = origPrice > sellPrice;
+                const imgUrl = item.variant.primary_image ? ASSET_BASE_URL + item.variant.primary_image.image : '';
 
                 return (
-                  <div key={product.id} className="wishlist-product-card">
+                  <div key={item.id} className="wishlist-product-card">
                     {/* Card Image Container */}
                     <div
                       className="wishlist-img-wrapper"
-                      onClick={() => navigate(`/product/${product.id}`)}
+                      onClick={() => navigate(`/product/${item.variant.id}`)}
                     >
-                      <img src={product.image} alt={product.name} className="wishlist-product-img" />
-
-
+                      {imgUrl ? (
+                         <img src={imgUrl} alt={item.product.name} className="wishlist-product-img" />
+                      ) : (
+                         <div className="product-img-placeholder" style={{height: '100%', backgroundColor: '#f0f0f0'}}></div>
+                      )}
 
                       {/* Remove Button */}
                       <button
@@ -109,7 +117,7 @@ const Wishlist = () => {
                         title="Remove from wishlist"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveFromWishlist(product.id, product.name);
+                          handleRemoveFromWishlist(item);
                         }}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -123,21 +131,27 @@ const Wishlist = () => {
 
                     {/* Card Details */}
                     <div className="wishlist-product-info">
-                      <span className="wishlist-category-tag">{product.category}</span>
+                      <span className="wishlist-category-tag">{item.category.name}</span>
                       <h3
                         className="wishlist-product-title"
-                        onClick={() => navigate(`/product/${product.id}`)}
+                        onClick={() => navigate(`/product/${item.variant.id}`)}
                       >
-                        {product.name}
+                        {item.product.name} {item.variant.color ? ` - ${item.variant.color.name}` : ''}
                       </h3>
+                      
+                      {item.variant.size && (
+                         <div style={{fontSize: '13px', color: '#666', marginTop: '4px'}}>
+                            Size: {item.variant.size.name}
+                         </div>
+                      )}
 
                       <div className="wishlist-product-pricing">
                         <span className="wishlist-price">
-                          Rs. {product.price.toLocaleString('en-IN')}.00
+                          Rs. {sellPrice.toLocaleString('en-IN')}.00
                         </span>
-                        {product.originalPrice > product.price && (
+                        {hasDiscount && (
                           <span className="wishlist-original-price">
-                            Rs. {product.originalPrice.toLocaleString('en-IN')}.00
+                            Rs. {origPrice.toLocaleString('en-IN')}.00
                           </span>
                         )}
                       </div>
@@ -146,13 +160,15 @@ const Wishlist = () => {
                       <div className="wishlist-card-actions">
                         <button
                           className="btn-wishlist-add-cart"
-                          onClick={() => handleAddToCart(product)}
+                          onClick={() => handleAddToCart(item)}
+                          disabled={item.variant.stock.stock_status === 'out_of_stock'}
                         >
-                          Add to Cart
+                          {item.variant.stock.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
                         </button>
                         <button
                           className="btn-wishlist-buy-now"
-                          onClick={() => handleBuyNow(product)}
+                          onClick={() => handleBuyNow(item)}
+                          disabled={item.variant.stock.stock_status === 'out_of_stock'}
                         >
                           Buy Now
                         </button>

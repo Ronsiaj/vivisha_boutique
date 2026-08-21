@@ -174,13 +174,12 @@ const Login = () => {
               />
               <span>Remember me</span>
             </label>
-            <button
-              type="button"
+            <Link
+              to="/forgot-password"
               className="forgot-password-link"
-              onClick={() => setShowForgotModal(true)}
             >
               Forgot Password?
-            </button>
+            </Link>
           </div>
 
           <button
@@ -225,43 +224,7 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
-      {showForgotModal && (
-        <div className="auth-modal-overlay" onClick={() => setShowForgotModal(false)}>
-          <div className="auth-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="auth-modal-header">
-              <h3>Reset Password</h3>
-              <button
-                className="auth-modal-close"
-                onClick={() => setShowForgotModal(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="auth-modal-body">
-              <p>
-                Enter your registered Email or Mobile Number below to receive a password reset link.
-              </p>
-              <div className="form-group">
-                <input
-                  type="text"
-                  placeholder="Enter email or mobile number"
-                  className="auth-modal-input"
-                />
-              </div>
-              <button
-                className="btn-auth-submit"
-                onClick={() => {
-                  alert('Password reset link has been sent if the account exists.');
-                  setShowForgotModal(false);
-                }}
-              >
-                Send Reset Link
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

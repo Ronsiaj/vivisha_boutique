@@ -1,175 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import banner1 from '../../assets/images/banner1.png';
-import banner2 from '../../assets/images/banner2.png';
-import banner3 from '../../assets/images/banner3.png';
 import { useCart } from '../context/CartContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-// Mock product dataset matching backend API schema
-const mockProducts = [
-  {
-    id: 1,
-    name: 'Peacock Blue Salwar Set (3 Piece Suit) - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    inStock: true,
-    rating: 4.8,
-    reviewsCount: 24,
-    sku: 'VB-3PS-101',
-    images: [banner1, banner2, banner3, banner1],
-    sizes: ['S', 'M', 'L', 'XL'],
-    description: 'Elevate your ethnic wardrobe with our exquisite Peacock Blue Salwar Set. Tailored in premium slub silk cotton fabric, this 3-piece suit offers unmatched elegance, comfort, and festive luster. Features traditional embroidery work on the neckline and includes a matching dupatta.',
-    specifications: {
-      fabric: 'Slub Silk Cotton',
-      topLength: '44 Inches',
-      bottomType: 'Salwar Pants',
-      dupattaFabric: 'Chiffon Silk',
-      washCare: 'Dry Clean Only'
-    }
-  },
-  {
-    id: 2,
-    name: 'Avocado Green Salwar Suit - Slub Silk',
-    category: 'Salwar Sets',
-    price: 1799,
-    originalPrice: 2299,
-    inStock: true,
-    rating: 4.7,
-    reviewsCount: 18,
-    sku: 'VB-SLW-102',
-    images: [banner2, banner1, banner3, banner2],
-    sizes: ['M', 'L', 'XL'],
-    description: 'A charming avocado green salwar suit set crafted with rich slub silk. Perfectly blend grace and fashion for any festive or casual gathering.',
-    specifications: {
-      fabric: 'Slub Silk',
-      topLength: '42 Inches',
-      bottomType: 'Comfort Pants',
-      dupattaFabric: 'Organza',
-      washCare: 'Dry Clean Only'
-    }
-  },
-  {
-    id: 3,
-    name: 'Mustard 3 Piece Set - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    inStock: true,
-    rating: 4.9,
-    reviewsCount: 31,
-    sku: 'VB-3PS-103',
-    images: [banner3, banner2, banner1, banner3],
-    sizes: ['S', 'M', 'L'],
-    description: 'Vibrant mustard yellow 3-piece suit featuring intricate neckline work and lightweight silk cotton fabric.',
-    specifications: {
-      fabric: 'Slub Silk Cotton',
-      topLength: '44 Inches',
-      bottomType: 'Palazzo Pants',
-      dupattaFabric: 'Silk Blend',
-      washCare: 'Hand Wash / Dry Clean'
-    }
-  },
-  {
-    id: 4,
-    name: 'Royal Magenta Anarkali Suit Set with Dupatta',
-    category: 'Anarkali Suits',
-    price: 2499,
-    originalPrice: 3199,
-    inStock: true,
-    rating: 5.0,
-    reviewsCount: 42,
-    sku: 'VB-ANK-104',
-    images: [banner1, banner3, banner2, banner1],
-    sizes: ['L', 'XL', 'XXL'],
-    description: 'Regal magenta flared Anarkali suit set with heavy Dupatta. Designed to make a stunning statement at weddings and grand celebrations.',
-    specifications: {
-      fabric: 'Georgette Silk',
-      topLength: '52 Inches',
-      bottomType: 'Churidar',
-      dupattaFabric: 'Net Embroidery',
-      washCare: 'Dry Clean Only'
-    }
-  },
-  {
-    id: 5,
-    name: 'Handcrafted Festive Silk Kurti Set',
-    category: 'Slub Silk',
-    price: 1999,
-    originalPrice: 2599,
-    inStock: true,
-    rating: 4.6,
-    reviewsCount: 15,
-    sku: 'VB-SLK-105',
-    images: [banner2, banner3, banner1, banner2],
-    sizes: ['M', 'L', 'XL'],
-    description: 'Elegant handcrafted festive kurti set in premium slub silk with subtle zari highlights.',
-    specifications: {
-      fabric: 'Pure Slub Silk',
-      topLength: '44 Inches',
-      bottomType: 'Straight Pants',
-      dupattaFabric: 'Silk Dupatta',
-      washCare: 'Dry Clean Only'
-    }
-  },
-  {
-    id: 6,
-    name: 'Elegance Emerald Green Salwar Suit',
-    category: 'Salwar Sets',
-    price: 1899,
-    originalPrice: 2399,
-    inStock: true,
-    rating: 4.8,
-    reviewsCount: 29,
-    sku: 'VB-SLW-106',
-    images: [banner3, banner1, banner2, banner3],
-    sizes: ['S', 'M', 'L', 'XXL'],
-    description: 'Sophisticated emerald green salwar set with artistic border detailing and breathable cotton lining.',
-    specifications: {
-      fabric: 'Cotton Silk Blend',
-      topLength: '43 Inches',
-      bottomType: 'Salwar',
-      dupattaFabric: 'Chiffon',
-      washCare: 'Dry Clean Only'
-    }
-  }
-];
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
+const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
 
 const ProductDetails = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // This is the variant_id!
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  const [product, setProduct] = useState(null);
+  const [variant, setVariant] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
-  const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [lightboxImg, setLightboxImg] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
-  const [sizeError, setSizeError] = useState(false);
 
-  // Dynamic Product Fetching
   useEffect(() => {
-    const foundProduct = mockProducts.find(p => p.id === parseInt(id, 10));
-    if (foundProduct) {
-      setProduct(foundProduct);
-      setSelectedImgIndex(0);
-      if (foundProduct.sizes && foundProduct.sizes.length > 0) {
-        setSelectedSize(foundProduct.sizes[0]);
+    const fetchVariantDetails = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/varient/view.php?id=${id}`);
+        const data = await response.json();
+        if (data.status && data.data && data.data.variant) {
+          setVariant(data.data.variant);
+          setSelectedImgIndex(0);
+        } else {
+          setVariant(null);
+        }
+      } catch (err) {
+        console.error("Error fetching variant details:", err);
+        setVariant(null);
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      setProduct(null);
-    }
+    };
+    
+    fetchVariantDetails();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id]);
 
-  if (!product) {
+  if (isLoading) {
+    return (
+      <div className="product-details-page" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <h2>Loading Product...</h2>
+      </div>
+    );
+  }
+
+  if (!variant) {
     return (
       <div className="product-not-found-container">
         <div className="container text-center py-5">
@@ -183,16 +70,19 @@ const ProductDetails = () => {
     );
   }
 
-  const isWishlisted = isInWishlist(product.id);
-
-  const discountPercent = product.originalPrice > product.price
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const isWishlisted = isInWishlist(variant.id);
+  
+  const sellPrice = parseFloat(variant.pricing.selling_price);
+  const origPrice = parseFloat(variant.pricing.original_price);
+  const hasDiscount = origPrice > sellPrice;
+  const discountPercent = hasDiscount
+    ? Math.round(((origPrice - sellPrice) / origPrice) * 100)
     : 0;
 
   const handleQuantityChange = (type) => {
     if (type === 'decrease' && quantity > 1) {
       setQuantity(prev => prev - 1);
-    } else if (type === 'increase' && quantity < 10) {
+    } else if (type === 'increase' && quantity < variant.stock.available_quantity) {
       setQuantity(prev => prev + 1);
     }
   };
@@ -202,12 +92,14 @@ const ProductDetails = () => {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
-    if (!selectedSize) {
-      setSizeError(true);
-      return;
-    }
-    setSizeError(false);
-    addToCart({ ...product, image: product.images[0] || banner1 }, quantity);
+    const cartItem = {
+      id: variant.product.id,
+      name: variant.product.name,
+      price: sellPrice,
+      image: variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '',
+      variantId: variant.id
+    };
+    addToCart(cartItem, quantity);
   };
 
   const handleBuyNow = () => {
@@ -215,12 +107,7 @@ const ProductDetails = () => {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
-    if (!selectedSize) {
-      setSizeError(true);
-      return;
-    }
-    setSizeError(false);
-    addToCart({ ...product, image: product.images[0] || banner1 }, quantity);
+    handleAddToCart();
     navigate('/cart');
   };
 
@@ -229,7 +116,7 @@ const ProductDetails = () => {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
-    toggleWishlist(product);
+    toggleWishlist(variant);
   };
 
   const openLightbox = (imgUrl, idx = null) => {
@@ -240,32 +127,34 @@ const ProductDetails = () => {
     setIsLightboxOpen(true);
   };
 
+  const getImageUrl = (img) => {
+    if (!img) return banner1; // Fallback
+    return ASSET_BASE_URL + img.image;
+  };
+  
+  const displayImages = variant.images && variant.images.length > 0 ? variant.images : [variant.primary_image].filter(Boolean);
+
   return (
     <div className="product-details-page">
-      {/* Breadcrumb Bar */}
       <div className="container">
         <nav className="product-breadcrumb">
           <Link to="/">Home</Link>
           <span className="separator">/</span>
           <Link to="/collections">Collections</Link>
           <span className="separator">/</span>
-          <span className="current">{product.name}</span>
+          <span className="current">{variant.product.name}</span>
         </nav>
       </div>
 
       <div className="container product-details-layout">
-        {/* ========================================================= */}
-        {/* LEFT COLUMN: IMAGE GALLERY                                */}
-        {/* ========================================================= */}
         <div className="product-gallery-container">
-          {/* Main Default Image */}
           <div
             className="main-image-wrapper"
-            onClick={() => openLightbox(product.images[selectedImgIndex] || banner1)}
+            onClick={() => openLightbox(displayImages[selectedImgIndex] ? getImageUrl(displayImages[selectedImgIndex]) : banner1)}
           >
             <img
-              src={product.images[selectedImgIndex] || banner1}
-              alt={product.name}
+              src={displayImages[selectedImgIndex] ? getImageUrl(displayImages[selectedImgIndex]) : banner1}
+              alt={variant.product.name}
               className="main-product-img"
             />
             {discountPercent > 0 && (
@@ -282,86 +171,97 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Additional Thumbnails Strip (Click opens in Dialog Box) */}
-          <div className="thumbnails-strip">
-            {product.images.map((img, idx) => (
-              <button
-                key={idx}
-                className={`thumbnail-btn ${selectedImgIndex === idx ? 'active' : ''}`}
-                onClick={() => openLightbox(img, idx)}
-                title="Click to open in dialog box"
-              >
-                <img src={img} alt={`${product.name} view ${idx + 1}`} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* RIGHT COLUMN: PRODUCT DETAILS & ACTIONS                  */}
-        {/* ========================================================= */}
-        <div className="product-info-container">
-          <span className="product-category-badge">{product.category}</span>
-          <h1 className="product-main-title">{product.name}</h1>
-
-          <div className="product-meta-row">
-            <span className="product-sku">SKU: {product.sku}</span>
-            <span className="stock-status in-stock">
-              <span className="status-dot"></span> In Stock
-            </span>
-          </div>
-
-          {/* Pricing Section */}
-          <div className="product-price-box">
-            <span className="current-price">Rs. {product.price.toLocaleString('en-IN')}.00</span>
-            {product.originalPrice > product.price && (
-              <span className="strikethrough-price">Rs. {product.originalPrice.toLocaleString('en-IN')}.00</span>
-            )}
-            {discountPercent > 0 && (
-              <span className="savings-badge">Save ₹{(product.originalPrice - product.price).toLocaleString('en-IN')}</span>
-            )}
-          </div>
-
-          <p className="short-description">{product.description}</p>
-
-          {/* Size Selector */}
-          <div className="size-selector-section">
-            <div className="size-header">
-              <span className="size-label">Select Size:</span>
-              {sizeError && <span className="size-error-msg">* Please select a size</span>}
-            </div>
-            <div className="size-options-row">
-              {product.sizes.map((size) => (
+          {displayImages.length > 1 && (
+            <div className="thumbnails-strip">
+              {displayImages.map((img, idx) => (
                 <button
-                  key={size}
-                  className={`size-btn ${selectedSize === size ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedSize(size);
-                    setSizeError(false);
-                  }}
+                  key={img.id || idx}
+                  className={`thumbnail-btn ${selectedImgIndex === idx ? 'active' : ''}`}
+                  onClick={() => setSelectedImgIndex(idx)}
+                  title="Click to view"
                 >
-                  {size}
+                  <img src={getImageUrl(img)} alt={`${variant.product.name} view ${idx + 1}`} />
                 </button>
               ))}
             </div>
+          )}
+        </div>
+
+        <div className="product-info-container">
+          {variant.category && (
+            <span className="product-category-badge">{variant.category.name}</span>
+          )}
+          
+          <h1 className="product-main-title">
+            {variant.product.name} {variant.color ? ` - ${variant.color.name}` : ''}
+          </h1>
+
+          <div className="product-meta-row">
+            <span className="product-sku">SKU: {variant.sku}</span>
+            <span className={`stock-status ${variant.stock.stock_status === 'out_of_stock' ? 'out-of-stock' : 'in-stock'}`}>
+              <span className="status-dot"></span> 
+              {variant.stock.stock_status === 'out_of_stock' ? 'Out of Stock' : 'In Stock'}
+            </span>
           </div>
 
-          {/* Quantity Selector */}
+          <div className="product-price-box">
+            <span className="current-price">Rs. {sellPrice.toLocaleString('en-IN')}.00</span>
+            {hasDiscount && (
+              <span className="strikethrough-price">Rs. {origPrice.toLocaleString('en-IN')}.00</span>
+            )}
+            {hasDiscount && (
+              <span className="savings-badge">Save ₹{(origPrice - sellPrice).toLocaleString('en-IN')}</span>
+            )}
+          </div>
+
+          <p className="short-description">{variant.product.description}</p>
+
+          {variant.size && (
+            <div className="size-selector-section">
+              <div className="size-header">
+                <span className="size-label">Size:</span>
+              </div>
+              <div className="size-options-row">
+                <button className="size-btn active">
+                  {variant.size.name}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="quantity-section">
             <span className="quantity-label">Quantity:</span>
             <div className="quantity-stepper">
-              <button onClick={() => handleQuantityChange('decrease')} disabled={quantity <= 1}>-</button>
+              <button 
+                onClick={() => handleQuantityChange('decrease')} 
+                disabled={quantity <= 1 || variant.stock.stock_status === 'out_of_stock'}
+              >-</button>
               <span>{quantity}</span>
-              <button onClick={() => handleQuantityChange('increase')} disabled={quantity >= 10}>+</button>
+              <button 
+                onClick={() => handleQuantityChange('increase')} 
+                disabled={quantity >= variant.stock.available_quantity || variant.stock.stock_status === 'out_of_stock'}
+              >+</button>
             </div>
+            {variant.stock.stock_status !== 'out_of_stock' && (
+               <span style={{marginLeft: '15px', fontSize: '13px', color: '#666'}}>
+                 {variant.stock.available_quantity} available
+               </span>
+            )}
           </div>
 
-          {/* Action Buttons: Add to Cart, Buy Now & Wishlist */}
           <div className="product-action-buttons">
-            <button className="btn-add-to-cart" onClick={handleAddToCart}>
-              Add to Cart
+            <button 
+              className="btn-add-to-cart" 
+              onClick={handleAddToCart}
+              disabled={variant.stock.stock_status === 'out_of_stock'}
+            >
+              {variant.stock.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
             </button>
-            <button className="btn-buy-now-detail" onClick={handleBuyNow}>
+            <button 
+              className="btn-buy-now-detail" 
+              onClick={handleBuyNow}
+              disabled={variant.stock.stock_status === 'out_of_stock'}
+            >
               Buy Now
             </button>
             <button
@@ -375,7 +275,6 @@ const ProductDetails = () => {
             </button>
           </div>
 
-          {/* Details Accordion / Tabs */}
           <div className="product-tabs-container">
             <div className="tabs-header">
               <button
@@ -384,47 +283,11 @@ const ProductDetails = () => {
               >
                 Product Details
               </button>
-              <button
-                className={`tab-btn ${activeTab === 'specifications' ? 'active' : ''}`}
-                onClick={() => setActiveTab('specifications')}
-              >
-                Specifications
-              </button>
             </div>
-
             <div className="tab-content">
               {activeTab === 'description' && (
                 <div className="tab-pane">
-                  <p>{product.description}</p>
-                </div>
-              )}
-
-              {activeTab === 'specifications' && (
-                <div className="tab-pane">
-                  <table className="specs-table">
-                    <tbody>
-                      <tr>
-                        <td>Fabric</td>
-                        <td>{product.specifications.fabric}</td>
-                      </tr>
-                      <tr>
-                        <td>Top Length</td>
-                        <td>{product.specifications.topLength}</td>
-                      </tr>
-                      <tr>
-                        <td>Bottom Style</td>
-                        <td>{product.specifications.bottomType}</td>
-                      </tr>
-                      <tr>
-                        <td>Dupatta</td>
-                        <td>{product.specifications.dupattaFabric}</td>
-                      </tr>
-                      <tr>
-                        <td>Wash Care</td>
-                        <td>{product.specifications.washCare}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <p>{variant.product.description}</p>
                 </div>
               )}
             </div>
@@ -432,9 +295,6 @@ const ProductDetails = () => {
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* FULLSCREEN IMAGE DIALOG BOX WITH CLOSE BUTTON             */}
-      {/* ========================================================= */}
       {isLightboxOpen && (
         <div className="lightbox-modal-overlay" onClick={() => setIsLightboxOpen(false)}>
           <div className="lightbox-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -445,8 +305,8 @@ const ProductDetails = () => {
               </svg>
             </button>
             <img
-              src={lightboxImg || product.images[selectedImgIndex] || banner1}
-              alt={product.name}
+              src={lightboxImg || getImageUrl(displayImages[selectedImgIndex])}
+              alt={variant.product.name}
               className="lightbox-img"
             />
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AdminPagination from '../../components/admin/AdminPagination.jsx';
 
 const AdminVariants = () => {
   const { token } = useAuth();
@@ -9,6 +10,11 @@ const AdminVariants = () => {
   const [colours, setColours] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,16 +58,21 @@ const AdminVariants = () => {
   };
 
   // Fetch Variants
-  const fetchVariants = async () => {
+  const fetchVariants = async (page = 1) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/varient/list.php', {
+      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/varient/list.php?page=${page}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status) {
         setVariants(result.data.variants);
+        if (result.data.pagination) {
+          setCurrentPage(result.data.pagination.page);
+          setTotalPages(result.data.pagination.total_pages);
+          setTotalRecords(result.data.pagination.total_records);
+        }
       } else {
         setError(result.message || 'Failed to fetch variants');
       }
@@ -74,7 +85,7 @@ const AdminVariants = () => {
 
   useEffect(() => {
     fetchDependencies();
-    fetchVariants();
+    fetchVariants(1);
   }, [token]);
 
   // Handle Input Changes
@@ -191,7 +202,7 @@ const AdminVariants = () => {
       
       if (result.status) {
         closeModal();
-        fetchVariants(); 
+        fetchVariants(currentPage); 
       } else {
         setError(result.message || 'Operation failed');
       }
@@ -303,6 +314,19 @@ const AdminVariants = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {!isLoading && totalPages > 1 && (
+          <div className="admin-pagination-wrapper">
+            <div className="admin-pagination-info">
+              Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalRecords)} of {totalRecords} variants
+            </div>
+            <AdminPagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => fetchVariants(page)}
+            />
           </div>
         )}
       </div>

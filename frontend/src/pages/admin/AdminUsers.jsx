@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import AsyncSelect from 'react-select/async';
+import AdminPagination from '../../components/admin/AdminPagination.jsx';
 
 const AdminUsers = () => {
   const { token } = useAuth();
@@ -13,6 +14,7 @@ const AdminUsers = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal State
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -52,7 +54,10 @@ const AdminUsers = () => {
       
       if (result.status) {
         setUsers(result.data.users);
-        setTotalPages(result.data.pagination.total_pages);
+        if (result.data.pagination) {
+          setTotalPages(result.data.pagination.total_pages);
+          setTotalRecords(result.data.pagination.total_records);
+        }
       } else {
         setError(result.message || 'Failed to fetch users');
       }
@@ -369,26 +374,17 @@ const AdminUsers = () => {
         )}
       </div>
 
-      {/* Pagination (Simple) */}
+      {/* Pagination */}
       {!isLoading && totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '20px' }}>
-          <button 
-            disabled={page <= 1} 
-            onClick={() => setPage(p => p - 1)}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: page <= 1 ? '#f3f4f6' : '#fff', color: page <= 1 ? '#9ca3af' : '#374151', cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
-          >
-            Previous
-          </button>
-          <span style={{ display: 'flex', alignItems: 'center', fontSize: '0.9rem', fontWeight: '600', color: '#4b5563' }}>
-            Page {page} of {totalPages}
-          </span>
-          <button 
-            disabled={page >= totalPages} 
-            onClick={() => setPage(p => p + 1)}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: page >= totalPages ? '#f3f4f6' : '#fff', color: page >= totalPages ? '#9ca3af' : '#374151', cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
-          >
-            Next
-          </button>
+        <div className="admin-pagination-wrapper">
+          <div className="admin-pagination-info">
+            Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, totalRecords)} of {totalRecords} users
+          </div>
+          <AdminPagination 
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         </div>
       )}
 

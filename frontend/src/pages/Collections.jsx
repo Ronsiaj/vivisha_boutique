@@ -1,83 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import banner1 from '../../assets/images/banner1.png';
-import banner2 from '../../assets/images/banner2.png';
-import banner3 from '../../assets/images/banner3.png';
 import collectionsBanner from '../../assets/images/collections_banner.png';
 import { useCart } from '../context/CartContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const initialProducts = [
-  {
-    id: 1,
-    name: 'Peacock Blue Salwar Set (3 Piece Suit) - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner1,
-    inStock: true,
-    sizes: ['S', 'M', 'L', 'XL']
-  },
-  {
-    id: 2,
-    name: 'Avocado Green Salwar Suit - Slub Silk',
-    category: 'Salwar Sets',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner2,
-    inStock: true,
-    sizes: ['M', 'L', 'XL']
-  },
-  {
-    id: 3,
-    name: 'Mustard 3 Piece Set - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner3,
-    inStock: true,
-    sizes: ['S', 'M', 'L']
-  },
-  {
-    id: 4,
-    name: 'Royal Magenta Anarkali Suit Set with Dupatta',
-    category: 'Anarkali Suits',
-    price: 2499,
-    originalPrice: 3199,
-    image: banner1,
-    inStock: true,
-    sizes: ['L', 'XL', 'XXL']
-  },
-  {
-    id: 5,
-    name: 'Handcrafted Festive Silk Kurti Set',
-    category: 'Slub Silk',
-    price: 1999,
-    originalPrice: 2599,
-    image: banner2,
-    inStock: true,
-    sizes: ['M', 'L', 'XL']
-  },
-  {
-    id: 6,
-    name: 'Elegance Emerald Green Salwar Suit',
-    category: 'Salwar Sets',
-    price: 1899,
-    originalPrice: 2399,
-    image: banner3,
-    inStock: true,
-    sizes: ['S', 'M', 'L', 'XXL']
-  }
-];
-
-const availableSizesList = ['S', 'M', 'L', 'XL', 'XXL'];
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
+const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
 
 const sortOptions = [
-  { id: 'featured', label: 'Featured' },
   { id: 'newest', label: 'Newest' },
   { id: 'price-low', label: 'Price: Low to High' },
   { id: 'price-high', label: 'Price: High to Low' }
+];
+
+const availableSizesList = [
+  { id: 1, name: 'S' },
+  { id: 2, name: 'M' },
+  { id: 3, name: 'L' },
+  { id: 4, name: 'XL' },
+  { id: 5, name: 'XXL' },
+  { id: 10, name: 'Free Size' }
 ];
 
 const Collections = () => {
@@ -87,17 +30,23 @@ const Collections = () => {
   const { addToCart } = useCart();
   const { toggleWishlist: toggleWishlistContext, isInWishlist } = useWishlist();
 
-  // State Management
-  const [products, setProducts] = useState(initialProducts);
+  // API State
+  const [variants, setVariants] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Active Applied Filters State
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [maxPrice, setMaxPrice] = useState(3000);
-  const [sortBy, setSortBy] = useState('featured');
-  const [wishlist, setWishlist] = useState([]);
-
+  const [sortBy, setSortBy] = useState('newest');
+  
   // Desktop Accordions Open/Closed State
   const [openAccordions, setOpenAccordions] = useState({
     categories: true,
@@ -114,12 +63,11 @@ const Collections = () => {
   const sortRef = useRef(null);
 
   // Temporary State for Mobile Drawer Draft Changes
-  const [draftCategories, setDraftCategories] = useState([]);
-  const [draftSizes, setDraftSizes] = useState([]);
+  const [draftCategory, setDraftCategory] = useState(null);
+  const [draftSize, setDraftSize] = useState(null);
   const [draftInStock, setDraftInStock] = useState(false);
   const [draftMaxPrice, setDraftMaxPrice] = useState(3000);
 
-  // Close sort dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (sortRef.current && !sortRef.current.contains(event.target)) {
@@ -132,7 +80,6 @@ const Collections = () => {
     };
   }, []);
 
-  // Prevent background scrolling when mobile drawer is open
   useEffect(() => {
     if (isMobileDrawerOpen) {
       document.body.style.overflow = 'hidden';
@@ -144,8 +91,64 @@ const Collections = () => {
     };
   }, [isMobileDrawerOpen]);
 
-  // Derived Dynamic Categories
-  const categoriesList = Array.from(new Set(products.map(p => p.category)));
+  // Fetch Categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/category/list.php?limit=100`);
+        const data = await res.json();
+        if (data.status && data.data && data.data.categories) {
+          setCategoriesList(data.data.categories);
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Fetch Variants
+  useEffect(() => {
+    const fetchVariants = async () => {
+      setIsLoading(true);
+      try {
+        const query = new URLSearchParams();
+        query.append('page', currentPage);
+        query.append('limit', 12);
+        query.append('max_price', maxPrice);
+        
+        if (selectedCategory) query.append('category_id', selectedCategory);
+        if (selectedSize) query.append('size_id', selectedSize);
+        if (inStockOnly) query.append('stock_status', 'in_stock');
+        
+        if (sortBy === 'price-low') {
+          query.append('sort_by', 'selling_price');
+          query.append('sort_order', 'asc');
+        } else if (sortBy === 'price-high') {
+          query.append('sort_by', 'selling_price');
+          query.append('sort_order', 'desc');
+        } else {
+          query.append('sort_by', 'created_at');
+          query.append('sort_order', 'desc');
+        }
+
+        const res = await fetch(`${API_BASE_URL}/varient/list.php?${query.toString()}`);
+        const data = await res.json();
+        if (data.status && data.data) {
+          setVariants(data.data.variants || []);
+          if (data.data.pagination) {
+            setTotalPages(data.data.pagination.total_pages);
+            setTotalRecords(data.data.pagination.total_records);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch variants:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchVariants();
+  }, [currentPage, selectedCategory, selectedSize, inStockOnly, maxPrice, sortBy]);
 
   const toggleAccordion = (key) => {
     setOpenAccordions(prev => ({
@@ -154,139 +157,121 @@ const Collections = () => {
     }));
   };
 
-  const toggleWishlist = (product, e) => {
+  const toggleWishlist = (variant, e) => {
     e.stopPropagation();
     if (!isAuthenticated) {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
-    toggleWishlistContext(product);
+    toggleWishlistContext(variant);
   };
 
-  const handleAddToCart = (product, e) => {
+  const handleAddToCart = (variant, e) => {
     e.stopPropagation();
     if (!isAuthenticated) {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
-    addToCart(product, 1);
+    const cartItem = {
+      id: variant.product.id,
+      name: variant.product.name,
+      price: parseFloat(variant.pricing.selling_price),
+      image: variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '',
+      variantId: variant.id
+    };
+    addToCart(cartItem, 1);
   };
 
-  const handleBuyNow = (product, e) => {
+  const handleBuyNow = (variant, e) => {
     e.stopPropagation();
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: location.pathname } });
-      return;
+    handleAddToCart(variant, e);
+    if (isAuthenticated) {
+      navigate('/cart');
     }
-    addToCart(product, 1);
-    navigate('/cart');
   };
 
-  const handleCategoryToggle = (categoryName, isDraft = false) => {
+  const handleCategoryToggle = (categoryId, isDraft = false) => {
     if (isDraft) {
-      setDraftCategories(prev =>
-        prev.includes(categoryName)
-          ? prev.filter(c => c !== categoryName)
-          : [...prev, categoryName]
-      );
+      setDraftCategory(draftCategory === categoryId ? null : categoryId);
     } else {
-      setSelectedCategories(prev =>
-        prev.includes(categoryName)
-          ? prev.filter(c => c !== categoryName)
-          : [...prev, categoryName]
-      );
+      setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
+      setCurrentPage(1);
     }
   };
 
-  const handleSizeToggle = (size, isDraft = false) => {
+  const handleSizeToggle = (sizeId, isDraft = false) => {
     if (isDraft) {
-      setDraftSizes(prev =>
-        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-      );
+      setDraftSize(draftSize === sizeId ? null : sizeId);
     } else {
-      setSelectedSizes(prev =>
-        prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-      );
+      setSelectedSize(selectedSize === sizeId ? null : sizeId);
+      setCurrentPage(1);
     }
   };
 
   const openMobileDrawer = () => {
-    setDraftCategories([...selectedCategories]);
-    setDraftSizes([...selectedSizes]);
+    setDraftCategory(selectedCategory);
+    setDraftSize(selectedSize);
     setDraftInStock(inStockOnly);
     setDraftMaxPrice(maxPrice);
     setIsMobileDrawerOpen(true);
   };
 
   const applyMobileDrawer = () => {
-    setSelectedCategories(draftCategories);
-    setSelectedSizes(draftSizes);
+    setSelectedCategory(draftCategory);
+    setSelectedSize(draftSize);
     setInStockOnly(draftInStock);
     setMaxPrice(draftMaxPrice);
+    setCurrentPage(1);
     setIsMobileDrawerOpen(false);
   };
 
   const clearMobileDrawer = () => {
-    setDraftCategories([]);
-    setDraftSizes([]);
+    setDraftCategory(null);
+    setDraftSize(null);
     setDraftInStock(false);
     setDraftMaxPrice(3000);
   };
 
   const resetAllFilters = () => {
-    setSelectedCategories([]);
-    setSelectedSizes([]);
+    setSelectedCategory(null);
+    setSelectedSize(null);
     setInStockOnly(false);
     setMaxPrice(3000);
+    setCurrentPage(1);
   };
 
   const handleSelectSort = (optionId) => {
     setSortBy(optionId);
+    setCurrentPage(1);
     setIsSortDropdownOpen(false);
   };
 
-  const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Featured';
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
-  // Compute Active Filters Count
+  const currentSortLabel = sortOptions.find(o => o.id === sortBy)?.label || 'Newest';
+
   const activeFiltersCount =
-    selectedCategories.length +
-    selectedSizes.length +
+    (selectedCategory !== null ? 1 : 0) +
+    (selectedSize !== null ? 1 : 0) +
     (inStockOnly ? 1 : 0) +
     (maxPrice < 3000 ? 1 : 0);
 
-  // Filter & Sort Logic
-  const filteredProducts = products.filter(p => {
-    if (selectedCategories.length > 0 && !selectedCategories.includes(p.category)) return false;
-    if (inStockOnly && !p.inStock) return false;
-    if (p.price > maxPrice) return false;
-    if (selectedSizes.length > 0 && !p.sizes.some(s => selectedSizes.includes(s))) return false;
-    return true;
-  });
-
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortBy === 'price-low') return a.price - b.price;
-    if (sortBy === 'price-high') return b.price - a.price;
-    if (sortBy === 'newest') return b.id - a.id;
-    return 0; // Featured default
-  });
-
-  const handleProductClick = (productId) => {
-    navigate(`/product/${productId}`);
+  const handleProductClick = (variantId) => {
+    navigate(`/product/${variantId}`);
   };
 
   return (
     <div className="collections-page">
-      {/* Collections Banner */}
       <div className="collections-banner-wrapper">
-        <img
-          src={collectionsBanner}
-          alt="Vivisha Boutique Collections Banner"
-          className="collections-banner-img"
-        />
+        <img src={collectionsBanner} alt="Vivisha Boutique Collections" className="collections-banner-img" />
       </div>
 
       <div className="container collections-main-layout">
-        {/* DESKTOP SIDEBAR FILTERS */}
         <aside className="collections-sidebar">
           <div className="sidebar-filter-header">
             <h3 className="sidebar-main-title">Filters</h3>
@@ -297,7 +282,6 @@ const Collections = () => {
             )}
           </div>
 
-          {/* 1. Categories Accordion */}
           <div className="filter-block accordion-block">
             <div className="accordion-header" onClick={() => toggleAccordion('categories')}>
               <span className="accordion-title">Categories</span>
@@ -306,36 +290,32 @@ const Collections = () => {
             {openAccordions.categories && (
               <div className="accordion-content">
                 <button
-                  className={`cat-filter-btn ${selectedCategories.length === 0 ? 'active' : ''}`}
-                  onClick={() => setSelectedCategories([])}
+                  className={`cat-filter-btn ${selectedCategory === null ? 'active' : ''}`}
+                  onClick={() => { setSelectedCategory(null); setCurrentPage(1); }}
                 >
-                  All Products ({products.length})
+                  All Categories
                 </button>
                 <ul className="category-checkbox-list">
-                  {categoriesList.map((cat) => {
-                    const count = products.filter(p => p.category === cat).length;
-                    const isChecked = selectedCategories.includes(cat);
-                    return (
-                      <li key={cat}>
-                        <label className="checkbox-label">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleCategoryToggle(cat, false)}
-                          />
-                          <span className={isChecked ? 'label-text active' : 'label-text'}>
-                            {cat} ({count})
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
+                  {categoriesList.map((cat) => (
+                    <li key={cat.id}>
+                      <label className="checkbox-label" style={{ cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="desktop_category"
+                          checked={selectedCategory === cat.id}
+                          onChange={() => handleCategoryToggle(cat.id, false)}
+                        />
+                        <span className={selectedCategory === cat.id ? 'label-text active' : 'label-text'}>
+                          {cat.name}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
           </div>
 
-          {/* 2. Availability Accordion */}
           <div className="filter-block accordion-block">
             <div className="accordion-header" onClick={() => toggleAccordion('availability')}>
               <span className="accordion-title">Availability</span>
@@ -347,38 +327,34 @@ const Collections = () => {
                   <input
                     type="checkbox"
                     checked={inStockOnly}
-                    onChange={(e) => setInStockOnly(e.target.checked)}
+                    onChange={(e) => { setInStockOnly(e.target.checked); setCurrentPage(1); }}
                   />
-                  <span>In Stock ({products.filter(p => p.inStock).length})</span>
-                </label>
-                <label className="checkbox-label disabled">
-                  <input type="checkbox" disabled />
-                  <span>Out of Stock (0)</span>
+                  <span>In Stock</span>
                 </label>
               </div>
             )}
           </div>
 
-          {/* 3. Price Accordion */}
           <div className="filter-block accordion-block">
             <div className="accordion-header" onClick={() => toggleAccordion('price')}>
-              <span className="accordion-title">Price</span>
+              <span className="accordion-title">Max Price</span>
               <span className="accordion-icon">{openAccordions.price ? '−' : '+'}</span>
             </div>
             {openAccordions.price && (
               <div className="accordion-content">
                 <div className="price-slider-box">
                   <div className="price-values">
-                    <span>₹1,000</span>
+                    <span>₹0</span>
+                    <span style={{ padding: '0 8px' }}>-</span>
                     <span>₹{maxPrice.toLocaleString('en-IN')}.00</span>
                   </div>
                   <input
                     type="range"
-                    min="1000"
-                    max="3000"
-                    step="100"
+                    min="0"
+                    max="10000"
+                    step="500"
                     value={maxPrice}
-                    onChange={(e) => setMaxPrice(Number(e.target.value))}
+                    onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
                     className="price-range-input"
                   />
                 </div>
@@ -386,7 +362,6 @@ const Collections = () => {
             )}
           </div>
 
-          {/* 4. Size Accordion */}
           <div className="filter-block accordion-block">
             <div className="accordion-header" onClick={() => toggleAccordion('size')}>
               <span className="accordion-title">Size</span>
@@ -395,29 +370,23 @@ const Collections = () => {
             {openAccordions.size && (
               <div className="accordion-content">
                 <div className="size-pills-grid">
-                  {availableSizesList.map((size) => {
-                    const isSelected = selectedSizes.includes(size);
-                    return (
-                      <button
-                        key={size}
-                        className={`size-pill-btn ${isSelected ? 'active' : ''}`}
-                        onClick={() => handleSizeToggle(size, false)}
-                      >
-                        {size}
-                      </button>
-                    );
-                  })}
+                  {availableSizesList.map((size) => (
+                    <button
+                      key={size.id}
+                      className={`size-pill-btn ${selectedSize === size.id ? 'active' : ''}`}
+                      onClick={() => handleSizeToggle(size.id, false)}
+                    >
+                      {size.name}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
           </div>
         </aside>
 
-        {/* MAIN PRODUCT GRID & TOOLBAR */}
         <main className="collections-content">
-          {/* Toolbar */}
           <div className="collections-toolbar-bar">
-            {/* Mobile Filter Button */}
             <button className="mobile-filter-trigger-btn" onClick={openMobileDrawer}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -433,12 +402,10 @@ const Collections = () => {
               <span>Filter {activeFiltersCount > 0 && `(${activeFiltersCount})`}</span>
             </button>
 
-            {/* Results Count Text (Hidden on mobile via CSS) */}
             <div className="results-count-text">
-              Showing {sortedProducts.length} results in total
+              Showing {totalRecords} results in total
             </div>
 
-            {/* Sort By Dropdown Button & Popover Menu */}
             <div className="sort-button-wrapper" ref={sortRef}>
               <button
                 className="sort-trigger-btn"
@@ -466,29 +433,41 @@ const Collections = () => {
             </div>
           </div>
 
-          {/* Product Grid */}
           <div className="products-grid collections-grid">
-            {sortedProducts.length === 0 ? (
-              <div className="no-products-found">
+            {isLoading ? (
+              <div className="loading-spinner-container" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                Loading products...
+              </div>
+            ) : variants.length === 0 ? (
+              <div className="no-products-found" style={{ gridColumn: '1 / -1' }}>
                 <p>No products found matching your selected filters.</p>
                 <button className="btn-reset-empty" onClick={resetAllFilters}>
                   Clear All Filters
                 </button>
               </div>
             ) : (
-              sortedProducts.map((product) => {
-                const isWishlisted = isInWishlist(product.id);
+              variants.map((variant) => {
+                const sellPrice = parseFloat(variant.pricing.selling_price);
+                const origPrice = parseFloat(variant.pricing.original_price);
+                const hasDiscount = origPrice > sellPrice;
+                const imgUrl = variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '';
+                const isWishlisted = isInWishlist(variant.id);
+                
                 return (
-                  <div key={product.id} className="product-card">
+                  <div key={variant.id} className="product-card">
                     <div
                       className="product-image-wrapper"
-                      onClick={() => handleProductClick(product.id)}
+                      onClick={() => handleProductClick(variant.id)}
                     >
-                      <img src={product.image} alt={product.name} className="product-img" />
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={variant.product.name} className="product-img" />
+                      ) : (
+                        <div className="product-img-placeholder" style={{height: '100%', backgroundColor: '#f0f0f0'}}></div>
+                      )}
 
                       <button
                         className={`wishlist-heart-btn ${isWishlisted ? 'active' : ''}`}
-                        onClick={(e) => toggleWishlist(product, e)}
+                        onClick={(e) => toggleWishlist(variant, e)}
                         aria-label="Add to Wishlist"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? '#A049A3' : 'none'} stroke={isWishlisted ? '#A049A3' : '#333333'} strokeWidth="2">
@@ -496,9 +475,9 @@ const Collections = () => {
                         </svg>
                       </button>
 
-                      {product.originalPrice > product.price && (
+                      {hasDiscount && (
                         <span className="discount-tag">
-                          {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                          {Math.round(((origPrice - sellPrice) / origPrice) * 100)}% OFF
                         </span>
                       )}
                     </div>
@@ -506,28 +485,30 @@ const Collections = () => {
                     <div className="product-info">
                       <h4
                         className="product-title"
-                        onClick={() => handleProductClick(product.id)}
+                        onClick={() => handleProductClick(variant.id)}
                       >
-                        {product.name}
+                        {variant.product.name} {variant.color ? ` - ${variant.color.name}` : ''}
                       </h4>
 
                       <div className="product-pricing">
-                        <span className="price">Rs. {product.price.toLocaleString('en-IN')}.00</span>
-                        {product.originalPrice > product.price && (
-                          <span className="original-price">Rs. {product.originalPrice.toLocaleString('en-IN')}.00</span>
+                        <span className="price">Rs. {sellPrice.toLocaleString('en-IN')}.00</span>
+                        {hasDiscount && (
+                          <span className="original-price">Rs. {origPrice.toLocaleString('en-IN')}.00</span>
                         )}
                       </div>
 
                       <div className="product-card-actions">
                         <button
                           className="btn-add-cart"
-                          onClick={(e) => handleAddToCart(product, e)}
+                          onClick={(e) => handleAddToCart(variant, e)}
+                          disabled={variant.stock.stock_status === 'out_of_stock'}
                         >
-                          Add to Cart
+                          {variant.stock.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
                         </button>
                         <button
                           className="btn-buy-now"
-                          onClick={(e) => handleBuyNow(product, e)}
+                          onClick={(e) => handleBuyNow(variant, e)}
+                          disabled={variant.stock.stock_status === 'out_of_stock'}
                         >
                           Buy Now
                         </button>
@@ -538,10 +519,31 @@ const Collections = () => {
               })
             )}
           </div>
+          
+          {totalPages > 1 && (
+            <div className="pagination-container" style={{ display: 'flex', justifyContent: 'center', marginTop: '30px', gap: '10px' }}>
+              <button 
+                disabled={currentPage === 1} 
+                onClick={() => handlePageChange(currentPage - 1)}
+                style={{ padding: '8px 16px', border: '1px solid #ddd', background: '#fff', borderRadius: '4px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                Previous
+              </button>
+              <span style={{ padding: '8px 16px', background: '#F6EDF6', color: '#A049A3', borderRadius: '4px', fontWeight: 'bold' }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button 
+                disabled={currentPage === totalPages} 
+                onClick={() => handlePageChange(currentPage + 1)}
+                style={{ padding: '8px 16px', border: '1px solid #ddd', background: '#fff', borderRadius: '4px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </main>
       </div>
 
-      {/* MOBILE FILTER SIDE DRAWER */}
       <div
         className={`mobile-filter-drawer-overlay ${isMobileDrawerOpen ? 'open' : ''}`}
         onClick={() => setIsMobileDrawerOpen(false)}
@@ -564,22 +566,19 @@ const Collections = () => {
             <div className="drawer-section">
               <h4 className="drawer-section-title">Products Category</h4>
               <ul className="drawer-checkbox-list">
-                {categoriesList.map((cat) => {
-                  const count = products.filter(p => p.category === cat).length;
-                  const isChecked = draftCategories.includes(cat);
-                  return (
-                    <li key={cat}>
-                      <label className="drawer-checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleCategoryToggle(cat, true)}
-                        />
-                        <span>{cat} ({count})</span>
-                      </label>
-                    </li>
-                  );
-                })}
+                {categoriesList.map((cat) => (
+                  <li key={cat.id}>
+                    <label className="drawer-checkbox-label" style={{ cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="mobile_category"
+                        checked={draftCategory === cat.id}
+                        onChange={() => handleCategoryToggle(cat.id, true)}
+                      />
+                      <span>{cat.name}</span>
+                    </label>
+                  </li>
+                ))}
               </ul>
             </div>
 
@@ -591,27 +590,23 @@ const Collections = () => {
                   checked={draftInStock}
                   onChange={(e) => setDraftInStock(e.target.checked)}
                 />
-                <span>In Stock ({products.filter(p => p.inStock).length})</span>
-              </label>
-              <label className="drawer-checkbox-label disabled">
-                <input type="checkbox" disabled />
-                <span>Out of Stock (0)</span>
+                <span>In Stock</span>
               </label>
             </div>
 
             <div className="drawer-section">
-              <h4 className="drawer-section-title">Price Range</h4>
+              <h4 className="drawer-section-title">Max Price</h4>
               <div className="drawer-price-box">
                 <div className="price-inputs-row">
-                  <div className="price-badge">₹1,000</div>
+                  <div className="price-badge">₹0</div>
                   <span className="dash">-</span>
                   <div className="price-badge">₹{draftMaxPrice.toLocaleString('en-IN')}.00</div>
                 </div>
                 <input
                   type="range"
-                  min="1000"
-                  max="3000"
-                  step="100"
+                  min="0"
+                  max="10000"
+                  step="500"
                   value={draftMaxPrice}
                   onChange={(e) => setDraftMaxPrice(Number(e.target.value))}
                   className="modal-range-slider"
@@ -622,18 +617,15 @@ const Collections = () => {
             <div className="drawer-section">
               <h4 className="drawer-section-title">Size</h4>
               <div className="size-pills-grid">
-                {availableSizesList.map((size) => {
-                  const isSelected = draftSizes.includes(size);
-                  return (
-                    <button
-                      key={size}
-                      className={`size-pill-btn ${isSelected ? 'active' : ''}`}
-                      onClick={() => handleSizeToggle(size, true)}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
+                {availableSizesList.map((size) => (
+                  <button
+                    key={size.id}
+                    className={`size-pill-btn ${draftSize === size.id ? 'active' : ''}`}
+                    onClick={() => handleSizeToggle(size.id, true)}
+                  >
+                    {size.name}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

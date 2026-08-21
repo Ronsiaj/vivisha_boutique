@@ -20,6 +20,7 @@ import { CartProvider } from './context/CartContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
+import ForgotPassword from './pages/auth/ForgotPassword.jsx';
 
 // Admin Panel Imports
 import AdminLayout from './layouts/AdminLayout.jsx';
@@ -61,6 +62,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
 
                 {/* Unrestricted Information & Store Pages */}
                 <Route path="/collections" element={<Collections />} />

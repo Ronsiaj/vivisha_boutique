@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
 
 const CustomerProfile = ({ defaultTab = 'profile' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, token, isAuthenticated, updateUser } = useAuth();
 
   const getInitialTab = () => {
     if (location.pathname === '/orders') return 'orders';
@@ -18,25 +20,124 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
 
   const [activeTab, setActiveTab] = useState(getInitialTab());
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
   const [profileData, setProfileData] = useState({
-    fullName: user?.name || 'Ronsia Pathees',
-    email: user?.email || 'ronsia@example.com',
-    mobile: user?.phone || '+91 96883 43484',
-    dob: '1995-08-15',
-    gender: 'Female'
+    fullName: user?.name || '',
+    email: user?.email || '',
+    mobile: user?.phone || '',
+    dob: ''
   });
+  
   const [editFormData, setEditFormData] = useState({ ...profileData });
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/view.php`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        
+        if (data.status) {
+          const u = data.data.user;
+          const pData = {
+            fullName: u.name || '',
+            email: u.email || '',
+            mobile: u.mobile || '',
+            dob: u.date_of_birth || ''
+          };
+          setProfileData(pData);
+          setEditFormData(pData);
+        } else {
+          setErrorMsg(data.message || 'Failed to load profile');
+        }
+      } catch (err) {
+        setErrorMsg('Network error loading profile');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [isAuthenticated, token, navigate]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  // Mock User Info
-  const displayName = user?.name || 'Ronsia Pathees';
-  const displayEmail = user?.email || 'ronsia@example.com';
-  const displayPhone = user?.phone || '+91 96883 43484';
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const payload = {
+        name: editFormData.fullName,
+        mobile: editFormData.mobile
+      };
+
+      if (editFormData.email) payload.email = editFormData.email;
+      if (editFormData.dob) payload.date_of_birth = editFormData.dob;
+
+      const response = await fetch(`${API_BASE_URL}/users/update.php`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (data.status) {
+        const u = data.data.user;
+        const newProfileData = {
+          fullName: u.name || '',
+          email: u.email || '',
+          mobile: u.mobile || '',
+          dob: u.date_of_birth || ''
+        };
+        setProfileData(newProfileData);
+        setEditFormData(newProfileData);
+        setIsEditingProfile(false);
+        setSuccessMsg('Profile updated successfully!');
+        
+        // Update context if needed
+        updateUser({
+          name: u.name,
+          email: u.email,
+          phone: u.mobile
+        });
+        
+        setTimeout(() => setSuccessMsg(''), 3000);
+      } else {
+        setErrorMsg(data.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      setErrorMsg('Network error updating profile');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="customer-profile-page container"><p>Loading profile...</p></div>;
+  }
 
   return (
     <div className="customer-profile-page container">
@@ -45,7 +146,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
         <aside className="profile-sidebar-card">
           <div className="user-profile-summary">
             <div className="avatar-circle">
-              {profileData.fullName.charAt(0).toUpperCase()}
+              {profileData.fullName ? profileData.fullName.charAt(0).toUpperCase() : 'U'}
             </div>
             <h3 className="user-name">{profileData.fullName}</h3>
             <p className="user-email">{profileData.email}</p>
@@ -132,6 +233,9 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
 
         {/* Right Side — Main Profile Content */}
         <main className="profile-main-content">
+          {successMsg && <div style={{ color: 'green', marginBottom: '10px' }}>{successMsg}</div>}
+          {errorMsg && <div style={{ color: 'red', marginBottom: '10px' }}>{errorMsg}</div>}
+          
           {/* Header Title Section */}
           <div className="profile-page-header">
             <h1 className="profile-main-title">My Profile</h1>
@@ -144,7 +248,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
           <div className="profile-summary-card">
             <div className="profile-avatar-wrapper">
               <div className="profile-large-avatar">
-                {profileData.fullName.charAt(0).toUpperCase()}
+                {profileData.fullName ? profileData.fullName.charAt(0).toUpperCase() : 'U'}
               </div>
             </div>
             <div className="profile-summary-info">
@@ -188,11 +292,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
               {isEditingProfile ? (
                 <form 
                   className="profile-edit-form" 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    setProfileData(editFormData);
-                    setIsEditingProfile(false);
-                  }}
+                  onSubmit={handleUpdateProfile}
                 >
                   <div className="form-grid-2col">
                     <div className="form-group">
@@ -230,29 +330,18 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                         onChange={(e) => setEditFormData({...editFormData, dob: e.target.value})}
                       />
                     </div>
-                    <div className="form-group">
-                      <label>Gender</label>
-                      <select 
-                        value={editFormData.gender}
-                        onChange={(e) => setEditFormData({...editFormData, gender: e.target.value})}
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Female">Female</option>
-                        <option value="Male">Male</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
                   </div>
                   <div className="form-action-row">
                     <button 
                       type="button" 
                       className="btn-cancel" 
                       onClick={() => setIsEditingProfile(false)}
+                      disabled={isSaving}
                     >
                       Cancel
                     </button>
-                    <button type="submit" className="btn-save">
-                      Save Changes
+                    <button type="submit" className="btn-save" disabled={isSaving}>
+                      {isSaving ? 'Saving...' : 'Save Changes'}
                     </button>
                   </div>
                 </form>
@@ -264,7 +353,9 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                   </div>
                   <div className="info-display-item">
                     <span className="info-label">Email Address</span>
-                    <span className="info-value"><a href={`mailto:${profileData.email}`}>{profileData.email}</a></span>
+                    <span className="info-value">
+                      {profileData.email ? <a href={`mailto:${profileData.email}`}>{profileData.email}</a> : 'Not provided'}
+                    </span>
                   </div>
                   <div className="info-display-item">
                     <span className="info-label">Mobile Number</span>
@@ -274,72 +365,11 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                     <span className="info-label">Date of Birth</span>
                     <span className="info-value">{profileData.dob || 'Not provided'}</span>
                   </div>
-                  <div className="info-display-item">
-                    <span className="info-label">Gender</span>
-                    <span className="info-value">{profileData.gender || 'Not specified'}</span>
-                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Account Overview Cards */}
-          <div className="profile-section-block">
-            <h3 className="section-block-title">Account Overview</h3>
-            <div className="account-overview-grid">
-              <div className="overview-card">
-                <div className="overview-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <path d="M16 10a4 4 0 0 1-8 0"></path>
-                  </svg>
-                </div>
-                <div className="overview-card-meta">
-                  <span className="overview-card-label">My Orders</span>
-                  <strong className="overview-card-value">12 Orders</strong>
-                </div>
-              </div>
-
-              <div className="overview-card">
-                <div className="overview-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color, #C86395)" strokeWidth="2">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                  </svg>
-                </div>
-                <div className="overview-card-meta">
-                  <span className="overview-card-label">Wishlist</span>
-                  <strong className="overview-card-value">8 Items</strong>
-                </div>
-              </div>
-
-              <div className="overview-card">
-                <div className="overview-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                  </svg>
-                </div>
-                <div className="overview-card-meta">
-                  <span className="overview-card-label">Notifications</span>
-                  <strong className="overview-card-value">3 Unread</strong>
-                </div>
-              </div>
-
-              <div className="overview-card">
-                <div className="overview-icon-box">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                    <circle cx="12" cy="10" r="3"></circle>
-                  </svg>
-                </div>
-                <div className="overview-card-meta">
-                  <span className="overview-card-label">Saved Addresses</span>
-                  <strong className="overview-card-value">2 Addresses</strong>
-                </div>
-              </div>
-            </div>
-          </div>
         </main>
       </div>
     </div>

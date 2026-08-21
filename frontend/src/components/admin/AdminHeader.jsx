@@ -25,8 +25,8 @@ const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) =>
     <header className="admin-header">
       <div className="admin-header-left">
         {/* Toggle Button for Desktop */}
-        <button 
-          className="admin-sidebar-toggle desktop-toggle" 
+        <button
+          className="admin-sidebar-toggle desktop-toggle"
           onClick={onToggleSidebar}
           aria-label="Toggle Sidebar"
           title="Toggle Sidebar"
@@ -39,8 +39,8 @@ const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) =>
         </button>
 
         {/* Toggle Button for Mobile */}
-        <button 
-          className="admin-sidebar-toggle mobile-toggle" 
+        <button
+          className="admin-sidebar-toggle mobile-toggle"
           onClick={onToggleMobileSidebar}
           aria-label="Toggle Mobile Menu"
           title="Toggle Mobile Menu"
@@ -52,15 +52,15 @@ const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) =>
           </svg>
         </button>
 
-        <h2 className="admin-header-page-title">{currentTitle}</h2>
+        {/* <h2 className="admin-header-page-title">{currentTitle}</h2> */}
       </div>
 
       <div className="admin-header-right">
         {/* View Store Button */}
-        <Link 
-          to="/" 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <Link
+          to="/"
+          target="_blank"
+          rel="noopener noreferrer"
           className="admin-header-btn store-link-btn"
           title="Open Customer Website"
         >

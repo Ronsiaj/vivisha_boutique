@@ -12,7 +12,7 @@ const Header = () => {
   const location = useLocation();
   const { wishlistCount } = useWishlist();
   const { cartCount } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   const profileDestination = isAuthenticated ? '/profile' : '/login';
 
@@ -71,12 +71,29 @@ const Header = () => {
           </button>
 
           {/* Account Icon */}
-          <Link to={profileDestination} className={`header-icon user-circle-icon ${isNavActive('/profile') || isNavActive('/dashboard') || isNavActive('/login') ? 'active' : ''}`} aria-label="Account">
+          <Link to={profileDestination} className={`header-icon user-circle-icon hidden-on-mobile ${isNavActive('/profile') || isNavActive('/dashboard') || isNavActive('/login') ? 'active' : ''}`} aria-label="Account" title="My Account">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
           </Link>
+
+          {/* Logout Icon */}
+          {isAuthenticated && (
+            <button 
+              className="header-icon" 
+              onClick={() => logout()} 
+              aria-label="Logout" 
+              title="Logout"
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          )}
 
           {/* Wishlist Icon */}
           <Link to="/wishlist" className={`header-icon header-icon-with-badge ${isNavActive('/wishlist') ? 'active' : ''}`} aria-label="Wishlist">

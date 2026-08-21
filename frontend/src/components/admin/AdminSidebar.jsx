@@ -82,10 +82,21 @@ const AdminSidebar = ({ isCollapsed, isMobileOpen, onCloseMobile }) => {
         className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}
       >
         {/* Sidebar Header */}
-        <div className="admin-sidebar-header">
+        <div className="admin-sidebar-header" style={{ position: 'relative' }}>
           <div className="brand-badge-logo">
             <img src={logo} alt="Vivisha Boutique Logo" />
           </div>
+          {isMobileOpen && (
+            <button 
+              onClick={onCloseMobile} 
+              style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: '#F6EDF6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#A049A3', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Navigation List */}

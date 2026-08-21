@@ -4,6 +4,8 @@ import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import CartAbandonmentModal from '../components/CartAbandonmentModal';
 
+const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
+
 const Cart = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -15,10 +17,10 @@ const Cart = () => {
     totalSavings,
     deliveryFee,
     totalAmount,
-    updateQuantity,
     removeFromCart,
     appliedCoupon,
-    setAppliedCoupon
+    setAppliedCoupon,
+    isLoading
   } = useCart();
 
   const [showAbandonModal, setShowAbandonModal] = useState(false);
@@ -71,7 +73,11 @@ const Cart = () => {
         </div>
       </div>
 
-      {cartItems.length === 0 ? (
+      {isLoading ? (
+        <div className="empty-cart-container" style={{ padding: '40px 0' }}>
+          <p>Loading your cart...</p>
+        </div>
+      ) : cartItems.length === 0 ? (
         <div className="empty-cart-container">
           <div className="empty-cart-icon-box">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5">
@@ -95,36 +101,50 @@ const Cart = () => {
               <h3>Cart Items ({cartItems.length} Products)</h3>
             </div>
 
-            {cartItems.map((item) => (
-              <div key={item.id} className="cart-item-card">
-                <img src={item.image} alt={item.name} className="cart-item-img" />
-                <div className="cart-item-info">
-                  <span className="cart-item-category">{item.category}</span>
-                  <h3>{item.name}</h3>
-                  <div className="price-tag">
-                    <span className="current-price">₹{item.price}</span>
-                    {item.originalPrice && (
-                      <span className="original-price">₹{item.originalPrice}</span>
+            {cartItems.map((item) => {
+              const imgUrl = item.variant.primary_image ? ASSET_BASE_URL + item.variant.primary_image.image : '';
+              return (
+                <div key={item.cart_item_id} className="cart-item-card">
+                  {imgUrl ? (
+                    <img src={imgUrl} alt={item.product.name} className="cart-item-img" onClick={() => navigate(`/product/${item.variant_id}`)} style={{cursor: 'pointer'}} />
+                  ) : (
+                    <div className="cart-item-img" style={{backgroundColor: '#f0f0f0', cursor: 'pointer'}} onClick={() => navigate(`/product/${item.variant_id}`)}></div>
+                  )}
+                  <div className="cart-item-info">
+                    <span className="cart-item-category">{item.category.name}</span>
+                    <h3 style={{cursor: 'pointer'}} onClick={() => navigate(`/product/${item.variant_id}`)}>
+                      {item.product.name} {item.variant.color ? ` - ${item.variant.color.name}` : ''}
+                    </h3>
+                    {item.variant.size && (
+                      <div style={{fontSize: '13px', color: '#666', marginTop: '4px', marginBottom: '8px'}}>
+                        Size: {item.variant.size.name}
+                      </div>
                     )}
-                    <span className="item-subtotal-tag">
-                      Item Total: ₹{item.price * item.quantity}
-                    </span>
+                    <div className="price-tag">
+                      <span className="current-price">₹{item.unit_price}</span>
+                      {parseFloat(item.variant.pricing.original_price) > parseFloat(item.unit_price) && (
+                        <span className="original-price">₹{item.variant.pricing.original_price}</span>
+                      )}
+                      <span className="item-subtotal-tag">
+                        Item Total: ₹{item.line_total}
+                      </span>
+                    </div>
+                    <div className="qty-controls" style={{ border: 'none', background: 'transparent', padding: '0', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontWeight: '500', fontSize: '14px', color: '#555', background: '#f5f5f5', padding: '4px 12px', borderRadius: '4px' }}>
+                        Qty: {item.quantity}
+                      </span>
+                    </div>
                   </div>
-                  <div className="qty-controls">
-                    <button onClick={() => updateQuantity(item.id, -1)} aria-label="Decrease quantity">-</button>
-                    <span>Qty: {item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, 1)} aria-label="Increase quantity">+</button>
-                  </div>
+                  <button
+                    className="btn-remove-item"
+                    onClick={() => removeFromCart(item.cart_item_id)}
+                    title="Remove item"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  className="btn-remove-item"
-                  onClick={() => removeFromCart(item.id)}
-                  title="Remove item"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+              );
+            })}
 
             {/* "Missed Something?" Section */}
             <div className="missed-something-box">
@@ -202,13 +222,13 @@ const Cart = () => {
               <div className="summary-pricing">
                 <div className="pricing-row">
                   <span>Total Items ({cartCount} {cartCount === 1 ? 'pc' : 'pcs'})</span>
-                  <span>₹{totalOriginal || subtotal}</span>
+                  <span>₹{totalOriginal.toLocaleString('en-IN')}.00</span>
                 </div>
 
                 {totalSavings > 0 && (
                   <div className="pricing-row savings-row">
                     <span>Boutique Discount</span>
-                    <span className="savings-amount">-₹{totalSavings}</span>
+                    <span className="savings-amount">-₹{totalSavings.toLocaleString('en-IN')}.00</span>
                   </div>
                 )}
 
@@ -219,7 +239,7 @@ const Cart = () => {
 
                 <div className="pricing-row total-row">
                   <span>Total Amount</span>
-                  <span className="total-amount">₹{totalAmount}</span>
+                  <span className="total-amount">₹{totalAmount.toLocaleString('en-IN')}.00</span>
                 </div>
               </div>
 
@@ -227,7 +247,7 @@ const Cart = () => {
                 className="btn-proceed-checkout"
                 onClick={handleProceedToCheckout}
               >
-                Proceed to Checkout (₹{totalAmount})
+                Proceed to Checkout (₹{totalAmount.toLocaleString('en-IN')}.00)
               </button>
             </div>
           </div>

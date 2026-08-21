@@ -4,9 +4,11 @@ import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import CartAbandonmentModal from '../components/CartAbandonmentModal';
 
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
+
 const Checkout = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const {
     cartItems,
     cartCount,
@@ -35,90 +37,145 @@ const Checkout = () => {
   }, [isAuthenticated, navigate]);
 
   // Saved Addresses State
-  const [savedAddresses, setSavedAddresses] = useState([
-    {
-      id: 1,
-      name: user?.name || 'felix',
-      phone: user?.phone || '9443219395',
-      street: '4/625 1st cross street  sathiyamoorthy nagar ',
-      city: 'Sivaganga',
-      state: 'Tamil Nadu',
-      pincode: '630003'
-    },
-    {
-      id: 2,
-      name: 'jacob',
-      phone: '9443218374',
-      street: '2/432 2nd cross street periyakottai',
-      city: 'Sivaganga',
-      state: 'Tamil Nadu',
-      pincode: '630003'
-    }
-  ]);
-
-  const [selectedAddressId, setSelectedAddressId] = useState(1);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isAddressDrawerOpen, setIsAddressDrawerOpen] = useState(false);
   const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
 
   // Address Form State
   const [addressForm, setAddressForm] = useState({
-    name: '',
-    phone: '',
+    address_type: 'home',
+    door_no: '',
     street: '',
+    area: '',
     city: '',
+    district: '',
     state: '',
-    pincode: ''
+    pincode: '',
+    landmark: '',
+    is_default: 0
   });
+
+  const fetchAddresses = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/address/list.php`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.status) {
+        setSavedAddresses(data.data.addresses);
+        const defaultAddr = data.data.addresses.find((a) => a.is_default === 1);
+        if (defaultAddr) setSelectedAddressId(defaultAddr.id);
+        else if (data.data.addresses.length > 0) setSelectedAddressId(data.data.addresses[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      fetchAddresses();
+    }
+  }, [isAuthenticated, token]);
 
   const selectedAddress = savedAddresses.find((addr) => addr.id === selectedAddressId) || savedAddresses[0];
 
   const handleOpenAddNew = () => {
     setAddressForm({
-      name: user?.name || '',
-      phone: user?.phone || '',
+      address_type: 'home',
+      door_no: '',
       street: '',
+      area: '',
       city: '',
+      district: '',
       state: '',
-      pincode: ''
+      pincode: '',
+      landmark: '',
+      is_default: 0
     });
     setEditingAddressId(null);
     setIsAddingNewAddress(true);
+    setIsAddressDrawerOpen(true);
   };
 
   const handleEditAddress = (addr, e) => {
     e.stopPropagation();
     setAddressForm({
-      name: addr.name,
-      phone: addr.phone,
+      address_type: addr.address_type,
+      door_no: addr.door_no,
       street: addr.street,
+      area: addr.area,
       city: addr.city,
+      district: addr.district || '',
       state: addr.state,
-      pincode: addr.pincode
+      pincode: addr.pincode,
+      landmark: addr.landmark || '',
+      is_default: addr.is_default || 0
     });
     setEditingAddressId(addr.id);
     setIsAddingNewAddress(true);
   };
 
-  const handleSaveAddressSubmit = (e) => {
+  const handleSaveAddressSubmit = async (e) => {
     e.preventDefault();
-    if (!addressForm.name || !addressForm.phone || !addressForm.street || !addressForm.city) {
+    if (!addressForm.door_no || !addressForm.street || !addressForm.area || !addressForm.city || !addressForm.state || !addressForm.pincode) {
       alert('Please fill in all required address fields.');
       return;
     }
 
+    const endpoint = editingAddressId ? '/address/update.php' : '/address/create.php';
+    const payload = { ...addressForm };
     if (editingAddressId) {
-      setSavedAddresses((prev) =>
-        prev.map((a) => (a.id === editingAddressId ? { ...a, ...addressForm } : a))
-      );
-    } else {
-      const newId = Date.now();
-      const newAddr = { id: newId, ...addressForm };
-      setSavedAddresses((prev) => [newAddr, ...prev]);
-      setSelectedAddressId(newId);
+      payload.address_id = editingAddressId;
     }
-    setIsAddingNewAddress(false);
-    setEditingAddressId(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (data.status) {
+        setIsAddingNewAddress(false);
+        setEditingAddressId(null);
+        fetchAddresses();
+      } else {
+        alert(data.message || 'Error saving address');
+      }
+    } catch (err) {
+      console.error('Error saving address', err);
+      alert('Network error saving address');
+    }
+  };
+
+  const handleSelectAddress = async (id) => {
+    setSelectedAddressId(id);
+    try {
+      const response = await fetch(`${API_BASE_URL}/address/select_address.php`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ address_id: id })
+      });
+      const data = await response.json();
+      if (data.status) {
+        fetchAddresses();
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      console.error('Error setting default address', err);
+    }
   };
 
   const handleAttemptAbandon = () => {
@@ -161,13 +218,7 @@ const Checkout = () => {
 
     /**
      * API INTEGRATION POINT:
-     * await ApiCall.post('/orders/create.php', {
-     *   orderId: generatedOrderId,
-     *   items: cartItems,
-     *   shippingAddress: selectedAddress,
-     *   paymentMethod: selectedPayment,
-     *   totalAmount
-     * });
+     * await ApiCall.post('/orders/create.php', { ... })
      */
     clearCart();
   };
@@ -187,7 +238,6 @@ const Checkout = () => {
           <p className="confirmation-subtitle">
             Thank you for shopping at Vivisha Boutique. Your order <strong>#{placedOrderId}</strong> has been placed successfully and is being processed.
           </p>
-
           <div className="confirmation-actions">
             <Link to="/orders" className="btn-primary-purple">
               View Order History & Tracking
@@ -224,8 +274,6 @@ const Checkout = () => {
 
   return (
     <div className="checkout-page-container">
-
-
       <div className="checkout-wrapper">
         <div className="checkout-header-row">
           <div>
@@ -244,9 +292,7 @@ const Checkout = () => {
         </div>
 
         <div className="checkout-grid">
-          {/* Left Column: Delivery Address & Payment Method */}
           <div className="checkout-main-section">
-            {/* Delivery Address Card */}
             <div className="checkout-card-box address-card-box">
               <div className="section-label-sm">DELIVERY ADDRESS</div>
 
@@ -265,11 +311,11 @@ const Checkout = () => {
                     </svg>
                   </div>
                   <div className="address-details-content">
-                    <h4 className="address-user-name">{selectedAddress.name}</h4>
+                    <h4 className="address-user-name">{selectedAddress.user_name}</h4>
                     <p className="address-full-text">
-                      {selectedAddress.street}, {selectedAddress.city}, {selectedAddress.state}, {selectedAddress.pincode}
+                      {selectedAddress.door_no}, {selectedAddress.street}, {selectedAddress.area}, {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
                     </p>
-                    <p className="address-phone-text">+{selectedAddress.phone.startsWith('91') ? '' : '91-'}{selectedAddress.phone}</p>
+                    <p className="address-phone-text">+{selectedAddress.user_mobile}</p>
                   </div>
                   <div className="address-change-arrow">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -288,11 +334,9 @@ const Checkout = () => {
               )}
             </div>
 
-            {/* Payment Options */}
             <div className="checkout-card-box payment-section-box">
               <h2 className="payment-options-heading">Payment Options</h2>
 
-              {/* Offers Section */}
               <div className="payment-group-block">
                 <div className="payment-group-sublabel">OFFERS</div>
                 <div
@@ -319,7 +363,6 @@ const Checkout = () => {
                   </div>
                 </div>
 
-                {/* Expanded Coupon Input Box */}
                 {showCouponModal && (
                   <form onSubmit={handleApplyCouponSubmit} className="checkout-coupon-form">
                     <div className="input-btn-inline">
@@ -339,10 +382,8 @@ const Checkout = () => {
                 )}
               </div>
 
-              {/* Suggested / UPI Payment Methods */}
               <div className="payment-group-block">
                 <div className="payment-group-sublabel">SUGGESTED</div>
-
                 <div
                   className={`payment-option-card ${selectedPayment === 'upi' ? 'active' : ''}`}
                   onClick={() => setSelectedPayment('upi')}
@@ -358,11 +399,9 @@ const Checkout = () => {
                   <div className="payment-content-col">
                     <div className="payment-header-line">
                       <strong className="payment-title">UPI</strong>
-                      <span className="payment-amount-tag">₹{totalAmount}</span>
+                      <span className="payment-amount-tag">₹{totalAmount.toLocaleString('en-IN')}.00</span>
                     </div>
                     <p className="payment-sub-text">PhonePe, Google Pay, Paytm, BHIM & More</p>
-
-                    {/* UPI Brand Badges */}
                     <div className="upi-badges-row">
                       <span className="upi-pill phonepe">PhonePe</span>
                       <span className="upi-pill gpay">Google Pay</span>
@@ -373,7 +412,6 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Credit / Debit Card */}
               <div className="payment-group-block">
                 <div
                   className={`payment-option-card ${selectedPayment === 'card' ? 'active' : ''}`}
@@ -390,14 +428,13 @@ const Checkout = () => {
                   <div className="payment-content-col">
                     <div className="payment-header-line">
                       <strong className="payment-title">Credit / Debit Card</strong>
-                      <span className="payment-amount-tag">₹{totalAmount}</span>
+                      <span className="payment-amount-tag">₹{totalAmount.toLocaleString('en-IN')}.00</span>
                     </div>
                     <p className="payment-sub-text">RuPay, Visa, MasterCard, Amex</p>
                   </div>
                 </div>
               </div>
 
-              {/* Cash On Delivery */}
               <div className="payment-group-block">
                 <div className="payment-group-sublabel">CASH</div>
                 <div
@@ -415,14 +452,13 @@ const Checkout = () => {
                   <div className="payment-content-col">
                     <div className="payment-header-line">
                       <strong className="payment-title">Cash On Delivery</strong>
-                      <span className="payment-amount-tag">₹{totalAmount}</span>
+                      <span className="payment-amount-tag">₹{totalAmount.toLocaleString('en-IN')}.00</span>
                     </div>
                     <p className="payment-sub-text">Pay cash upon delivery at your doorstep</p>
                   </div>
                 </div>
               </div>
 
-              {/* User Profile Section */}
               <div className="payment-group-block user-profile-checkout-card">
                 <div className="payment-group-sublabel">USER PROFILE</div>
                 <Link to="/profile" className="profile-row-link">
@@ -446,19 +482,20 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* Right Column: Order Summary & Place Order */}
           <div className="checkout-summary-section">
             <div className="checkout-card-box summary-card">
               <h3>Order Summary</h3>
 
               <div className="summary-items-preview-box">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="checkout-item-preview">
-                    <img src={item.image} alt={item.name} />
+                  <div key={item.cart_item_id} className="checkout-item-preview">
+                    {item.variant.primary_image && (
+                      <img src={'http://localhost/vivisha_boutique/backend/' + item.variant.primary_image.image} alt={item.product.name} />
+                    )}
                     <div className="item-details">
-                      <h4>{item.name}</h4>
-                      <p>Qty: {item.quantity} × ₹{item.price}</p>
-                      <span className="item-price">₹{item.price * item.quantity}</span>
+                      <h4>{item.product.name}</h4>
+                      <p>Qty: {item.quantity} × ₹{item.unit_price}</p>
+                      <span className="item-price">₹{item.line_total}</span>
                     </div>
                   </div>
                 ))}
@@ -467,13 +504,13 @@ const Checkout = () => {
               <div className="summary-pricing">
                 <div className="pricing-row">
                   <span>Subtotal ({cartCount} items)</span>
-                  <span>₹{subtotal}</span>
+                  <span>₹{subtotal.toLocaleString('en-IN')}.00</span>
                 </div>
 
                 {totalSavings > 0 && (
                   <div className="pricing-row savings-row">
                     <span>Total Discount</span>
-                    <span className="savings-amount">-₹{totalSavings}</span>
+                    <span className="savings-amount">-₹{totalSavings.toLocaleString('en-IN')}.00</span>
                   </div>
                 )}
 
@@ -484,7 +521,7 @@ const Checkout = () => {
 
                 <div className="pricing-row total-row">
                   <span>Grand Total</span>
-                  <span className="total-amount">₹{totalAmount}</span>
+                  <span className="total-amount">₹{totalAmount.toLocaleString('en-IN')}.00</span>
                 </div>
               </div>
 
@@ -493,7 +530,7 @@ const Checkout = () => {
                 className="btn-complete-payment"
                 onClick={handlePlaceOrder}
               >
-                Place Order (₹{totalAmount})
+                Place Order (₹{totalAmount.toLocaleString('en-IN')}.00)
               </button>
 
               <button
@@ -508,7 +545,6 @@ const Checkout = () => {
         </div>
       </div>
 
-      {/* SELECT / ADD DELIVERY ADDRESS SIDE DRAWER / BOTTOM SHEET */}
       <div
         className={`address-drawer-overlay ${isAddressDrawerOpen ? 'open' : ''}`}
         onClick={() => setIsAddressDrawerOpen(false)}
@@ -536,7 +572,6 @@ const Checkout = () => {
           <div className="drawer-body">
             {!isAddingNewAddress ? (
               <>
-                {/* List of Saved Addresses */}
                 <div className="drawer-addresses-list">
                   {savedAddresses.map((addr) => {
                     const isSelected = addr.id === selectedAddressId;
@@ -544,22 +579,22 @@ const Checkout = () => {
                       <div
                         key={addr.id}
                         className={`drawer-address-item ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setSelectedAddressId(addr.id)}
+                        onClick={() => handleSelectAddress(addr.id)}
                       >
                         <div className="radio-col">
                           <input
                             type="radio"
                             name="drawerAddressSelect"
                             checked={isSelected}
-                            onChange={() => setSelectedAddressId(addr.id)}
+                            onChange={() => handleSelectAddress(addr.id)}
                           />
                         </div>
                         <div className="info-col">
-                          <strong className="user-name">{addr.name}</strong>
+                          <strong className="user-name">{addr.user_name}</strong>
                           <p className="full-address">
-                            {addr.street}, {addr.city}, {addr.state}, {addr.pincode}
+                            {addr.door_no}, {addr.street}, {addr.area}, {addr.city}, {addr.state} - {addr.pincode}
                           </p>
-                          <span className="phone-num">+{addr.phone.startsWith('91') ? '' : '91-'}{addr.phone}</span>
+
                         </div>
                         <button
                           className="edit-pencil-btn"
@@ -576,7 +611,6 @@ const Checkout = () => {
                   })}
                 </div>
 
-                {/* Add New Address Button */}
                 <button
                   type="button"
                   className="btn-add-new-address-trigger"
@@ -586,38 +620,37 @@ const Checkout = () => {
                 </button>
               </>
             ) : (
-              /* Add/Edit Address Form */
               <form onSubmit={handleSaveAddressSubmit} className="drawer-address-form">
                 <div className="form-group">
-                  <label htmlFor="drawerName">Full Name *</label>
+                  <label htmlFor="drawerDoorNo">Door No. *</label>
                   <input
                     type="text"
-                    id="drawerName"
-                    value={addressForm.name}
-                    onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
-                    placeholder="Enter full name"
+                    id="drawerDoorNo"
+                    value={addressForm.door_no}
+                    onChange={(e) => setAddressForm({ ...addressForm, door_no: e.target.value })}
+                    placeholder="House / Door No."
                     required
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="drawerPhone">Mobile Number *</label>
-                  <input
-                    type="text"
-                    id="drawerPhone"
-                    value={addressForm.phone}
-                    onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
-                    placeholder="Enter 10-digit mobile number"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="drawerStreet">Street Address / House No. *</label>
+                  <label htmlFor="drawerStreet">Street Name *</label>
                   <input
                     type="text"
                     id="drawerStreet"
                     value={addressForm.street}
                     onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
-                    placeholder="House No., Street Name, Area"
+                    placeholder="Street Name"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="drawerArea">Area / Locality *</label>
+                  <input
+                    type="text"
+                    id="drawerArea"
+                    value={addressForm.area}
+                    onChange={(e) => setAddressForm({ ...addressForm, area: e.target.value })}
+                    placeholder="Area / Locality"
                     required
                   />
                 </div>
@@ -681,12 +714,10 @@ const Checkout = () => {
                 DONE
               </button>
             )}
-
           </div>
         </div>
       </div>
 
-      {/* Cart Abandonment Modal / Bottom Sheet */}
       <CartAbandonmentModal
         isOpen={showAbandonModal}
         onContinue={handleContinueOrder}

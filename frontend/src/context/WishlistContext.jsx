@@ -1,92 +1,119 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext.jsx';
 
-// Import default mock banner images
-import banner1 from '../../assets/images/banner1.png';
-import banner2 from '../../assets/images/banner2.png';
-import banner3 from '../../assets/images/banner3.png';
-
-const initialWishlistItems = [
-  {
-    id: 1,
-    name: 'Peacock Blue Salwar Set (3 Piece Suit) - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner1,
-    inStock: true
-  },
-  {
-    id: 2,
-    name: 'Avocado Green Salwar Suit - Slub Silk',
-    category: 'Salwar Sets',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner2,
-    inStock: true
-  },
-  {
-    id: 3,
-    name: 'Mustard 3 Piece Set - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner3,
-    inStock: true
-  }
-];
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
 
 const WishlistContext = createContext();
 
 export const WishlistProvider = ({ children }) => {
-  const [wishlistItems, setWishlistItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('vivisha_wishlist_items');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Error reading wishlist from localStorage', e);
-    }
-    return initialWishlistItems;
-  });
+  const { isAuthenticated, token } = useAuth();
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vivisha_wishlist_items', JSON.stringify(wishlistItems));
-    } catch (e) {
-      console.error('Error saving wishlist to localStorage', e);
+    if (isAuthenticated && token) {
+      fetchWishlist();
+    } else {
+      setWishlistItems([]);
+      setWishlistCount(0);
     }
-  }, [wishlistItems]);
+  }, [isAuthenticated, token]);
 
-  // Dynamic Item Count
-  const wishlistCount = wishlistItems.length;
-
-  const addToWishlist = (product) => {
-    setWishlistItems((prev) => {
-      if (prev.some((item) => item.id === product.id)) {
-        return prev;
+  const fetchWishlist = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/wishlist/list.php?limit=100`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.status && data.data && data.data.wishlists) {
+        setWishlistItems(data.data.wishlists);
+        setWishlistCount(data.data.summary?.wishlist_count || data.data.wishlists.length);
+      } else {
+        setWishlistItems([]);
+        setWishlistCount(0);
       }
-      return [...prev, product];
-    });
+    } catch (err) {
+      console.error('Error fetching wishlist:', err);
+      setWishlistItems([]);
+      setWishlistCount(0);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const removeFromWishlist = (productId) => {
-    setWishlistItems((prev) => prev.filter((item) => item.id !== productId));
+  const addToWishlist = async (variantId) => {
+    if (!isAuthenticated || !token) return false;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/wishlist/add.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ variant_id: variantId })
+      });
+      const data = await response.json();
+      if (data.status) {
+        fetchWishlist();
+        return true;
+      } else {
+        console.error(data.message);
+        return false;
+      }
+    } catch (err) {
+      console.error('Error adding to wishlist:', err);
+      return false;
+    }
+  };
+
+  const removeFromWishlist = async (wishlistId) => {
+    if (!isAuthenticated || !token) return false;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/wishlist/remove.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ wishlist_id: wishlistId })
+      });
+      const data = await response.json();
+      if (data.status) {
+        setWishlistItems((prev) => prev.filter((item) => item.id !== wishlistId));
+        setWishlistCount((prev) => Math.max(0, prev - 1));
+        return true;
+      } else {
+        console.error(data.message);
+        return false;
+      }
+    } catch (err) {
+      console.error('Error removing from wishlist:', err);
+      return false;
+    }
   };
 
   const clearWishlist = () => {
     setWishlistItems([]);
+    setWishlistCount(0);
   };
 
-  const isInWishlist = (productId) => {
-    return wishlistItems.some((item) => item.id === productId);
+  const isInWishlist = (variantId) => {
+    return wishlistItems.some((item) => item.variant_id === variantId);
   };
 
-  const toggleWishlist = (product) => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-      return false; // Removed
+  const toggleWishlist = async (variant) => {
+    const existingItem = wishlistItems.find((item) => item.variant_id === variant.id);
+    if (existingItem) {
+      return await removeFromWishlist(existingItem.id);
     } else {
-      addToWishlist(product);
-      return true; // Added
+      return await addToWishlist(variant.id);
     }
   };
 
@@ -95,12 +122,13 @@ export const WishlistProvider = ({ children }) => {
       value={{
         wishlistItems,
         wishlistCount,
+        isLoading,
         addToWishlist,
         removeFromWishlist,
         clearWishlist,
         isInWishlist,
         toggleWishlist,
-        setWishlistItems
+        fetchWishlist
       }}
     >
       {children}

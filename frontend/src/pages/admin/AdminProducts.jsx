@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AdminPagination from '../../components/admin/AdminPagination.jsx';
 
 const AdminProducts = () => {
   const { token } = useAuth();
@@ -7,6 +8,11 @@ const AdminProducts = () => {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,16 +46,21 @@ const AdminProducts = () => {
   };
 
   // Fetch Products
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/product/list.php', {
+      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/product/list.php?page=${page}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status) {
         setProducts(result.data.products);
+        if (result.data.pagination) {
+          setCurrentPage(result.data.pagination.page);
+          setTotalPages(result.data.pagination.total_pages);
+          setTotalRecords(result.data.pagination.total_records);
+        }
       } else {
         setError(result.message || 'Failed to fetch products');
       }
@@ -62,7 +73,7 @@ const AdminProducts = () => {
 
   useEffect(() => {
     fetchCategories();
-    fetchProducts();
+    fetchProducts(1);
   }, [token]);
 
   // Handle Input Changes
@@ -157,7 +168,7 @@ const AdminProducts = () => {
       
       if (result.status) {
         closeModal();
-        fetchProducts(); 
+        fetchProducts(currentPage); 
       } else {
         setError(result.message || 'Operation failed');
       }
@@ -226,9 +237,9 @@ const AdminProducts = () => {
                       <td>{prod.category?.name || 'N/A'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {prod.is_new_arrival === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#e0e7ff', color: '#3730a3', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>NEW</span>}
-                          {prod.is_featured === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#fef08a', color: '#854d0e', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>FEATURED</span>}
-                          {prod.is_best_seller === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#fce7f3', color: '#be185d', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>BEST SELLER</span>}
+                          {prod.is_new_arrival === 1 && <span className="admin-badge admin-badge-new">NEW</span>}
+                          {prod.is_featured === 1 && <span className="admin-badge admin-badge-featured">FEATURED</span>}
+                          {prod.is_best_seller === 1 && <span className="admin-badge admin-badge-bestseller">BEST SELLER</span>}
                         </div>
                       </td>
                       <td>
@@ -263,6 +274,19 @@ const AdminProducts = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {!isLoading && totalPages > 1 && (
+          <div className="admin-pagination-wrapper">
+            <div className="admin-pagination-info">
+              Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalRecords)} of {totalRecords} products
+            </div>
+            <AdminPagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => fetchProducts(page)}
+            />
           </div>
         )}
       </div>
@@ -323,9 +347,9 @@ const AdminProducts = () => {
                   <div className="admin-info-box" style={{ gridColumn: '1 / -1' }}>
                     <span className="admin-info-label">Product Tags</span>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: formData.is_new_arrival ? '#e0e7ff' : '#f3f4f6', color: formData.is_new_arrival ? '#3730a3' : '#9ca3af' }}>New Arrival</span>
-                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: formData.is_featured ? '#fef08a' : '#f3f4f6', color: formData.is_featured ? '#854d0e' : '#9ca3af' }}>Featured</span>
-                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: formData.is_best_seller ? '#fce7f3' : '#f3f4f6', color: formData.is_best_seller ? '#be185d' : '#9ca3af' }}>Best Seller</span>
+                      <span className={`admin-badge ${formData.is_new_arrival ? 'admin-badge-new' : 'admin-badge-inactive'}`}>New Arrival</span>
+                      <span className={`admin-badge ${formData.is_featured ? 'admin-badge-featured' : 'admin-badge-inactive'}`}>Featured</span>
+                      <span className={`admin-badge ${formData.is_best_seller ? 'admin-badge-bestseller' : 'admin-badge-inactive'}`}>Best Seller</span>
                     </div>
                   </div>
                 </div>

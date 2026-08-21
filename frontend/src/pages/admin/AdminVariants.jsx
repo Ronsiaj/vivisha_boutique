@@ -215,7 +215,7 @@ const AdminVariants = () => {
           <p className="admin-module-desc">Manage sizes, colours, stock, and pricing per variant.</p>
         </div>
         <div className="admin-header-actions">
-          <button className="admin-btn admin-btn-primary" onClick={() => openModal('add')} style={{ backgroundColor: '#A049A3' }}>
+          <button className="admin-btn admin-btn-primary" onClick={() => openModal('add')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -231,20 +231,20 @@ const AdminVariants = () => {
         </div>
       )}
 
-      <div className="admin-card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+      <div className="admin-premium-card" style={{ padding: '0', overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading variants...</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="admin-table-container">
+            <table className="admin-table">
               <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>SKU</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Product</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Size / Color</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Price</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Stock</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem', textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th>SKU</th>
+                  <th>Product</th>
+                  <th>Size / Color</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -256,10 +256,10 @@ const AdminVariants = () => {
                   </tr>
                 ) : (
                   variants.map(vari => (
-                    <tr key={vari.id} style={{ borderBottom: '1px solid #e5e7eb', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fdfafc'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1f2937', fontFamily: 'monospace' }}>{vari.sku}</td>
-                      <td style={{ padding: '12px 16px', color: '#4b5563', fontSize: '0.875rem' }}>{vari.product_name}</td>
-                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '0.875rem' }}>
+                    <tr key={vari.id}>
+                      <td style={{ fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{vari.sku}</td>
+                      <td>{vari.product_name || '-'}</td>
+                      <td>
                         {vari.size?.name ? <span style={{ marginRight: '8px', padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontWeight: '500' }}>{vari.size.name}</span> : null}
                         {vari.color?.name ? (
                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -268,28 +268,18 @@ const AdminVariants = () => {
                            </span>
                         ) : null}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: '500', color: '#059669' }}>
-                        ${vari.selling_price}
+                      <td style={{ fontWeight: '600', color: '#059669' }}>
+                        ₹{vari.selling_price}
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ 
-                          padding: '4px 10px', 
-                          borderRadius: '9999px', 
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          backgroundColor: parseInt(vari.stock_quantity) > parseInt(vari.low_stock_limit) ? '#dcfce7' : '#fee2e2',
-                          color: parseInt(vari.stock_quantity) > parseInt(vari.low_stock_limit) ? '#166534' : '#991b1b',
-                          border: parseInt(vari.stock_quantity) > parseInt(vari.low_stock_limit) ? '1px solid #bbf7d0' : '1px solid #fecaca'
-                        }}>
+                      <td>
+                        <span className={`admin-badge ${parseInt(vari.stock_quantity) > parseInt(vari.low_stock_limit) ? 'admin-badge-active' : 'admin-badge-blocked'}`}>
                           {vari.stock_quantity} in stock
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
+                      <td style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
                         <button 
                           onClick={() => openModal('view', vari)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#4b5563', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
-                          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.backgroundColor = '#e5e7eb'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+                          className="admin-action-btn admin-action-view"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -299,9 +289,7 @@ const AdminVariants = () => {
                         </button>
                         <button 
                           onClick={() => openModal('edit', vari)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fdf2f8', border: '1px solid #fbcfe8', color: '#A049A3', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
-                          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#f9a8d4'; e.currentTarget.style.backgroundColor = '#fce7f3'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#fbcfe8'; e.currentTarget.style.backgroundColor = '#fdf2f8'; }}
+                          className="admin-action-btn admin-action-edit"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -321,30 +309,18 @@ const AdminVariants = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, 
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-          boxSizing: 'border-box'
-        }}>
-          <div className="admin-card" style={{ 
-            width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', 
-            padding: '24px', position: 'relative', borderRadius: '16px',
-            boxSizing: 'border-box', backgroundColor: '#ffffff',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-          }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-content" style={{ maxWidth: '750px' }}>
+            <div className="admin-modal-header">
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#111827', fontWeight: '700' }}>
+                {modalMode === 'add' ? 'Add New Variant' : modalMode === 'edit' ? 'Edit Variant' : 'Variant Details'}
+              </h2>
+              <button onClick={closeModal} className="admin-modal-close">
+                &times;
+              </button>
+            </div>
             
-            <button 
-              onClick={closeModal}
-              style={{ position: 'absolute', top: '20px', right: '20px', background: '#f3f4f6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', color: '#6b7280', transition: 'background 0.2s' }}
-            >
-              &times;
-            </button>
-            
-            <h2 style={{ marginBottom: '24px', fontSize: '1.25rem', color: '#111827', fontWeight: '700', paddingRight: '40px' }}>
-              {modalMode === 'add' ? 'Add New Variant' : modalMode === 'edit' ? 'Edit Variant' : 'Variant Details'}
-            </h2>
+            <div className="admin-modal-body">
 
             {error && (
               <div style={{ marginBottom: '20px', padding: '12px 16px', backgroundColor: '#fdf2f8', color: '#9d174d', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid #fbcfe8', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -355,29 +331,27 @@ const AdminVariants = () => {
 
             {isReadOnly ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>SKU</span>
+                <div className="admin-info-grid">
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">SKU</span>
                     <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{formData.sku}</span>
                   </div>
                   
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Product</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Product</span>
                     <span style={{ fontSize: '0.95rem', color: '#374151', fontWeight: '500' }}>
-                      {products.find(p => p.id === parseInt(formData.product_id))?.name || 'N/A'}
+                      {products.find(p => p.id === parseInt(formData.product_id))?.name || '-'}
                     </span>
                   </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Size</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Size</span>
                     <span style={{ fontSize: '0.95rem', color: '#374151' }}>
                       {sizes.find(s => s.id === parseInt(formData.size_id))?.name || 'None'}
                     </span>
                   </div>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Colour</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Colour</span>
                     <span style={{ fontSize: '0.95rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {(() => {
                         const col = colours.find(c => c.id === parseInt(formData.color_id));
@@ -387,35 +361,29 @@ const AdminVariants = () => {
                       })()}
                     </span>
                   </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Orig Price</span>
-                    <span style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>${formData.original_price}</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Orig Price</span>
+                    <span style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>₹{formData.original_price}</span>
                   </div>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Discount</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Discount</span>
                     <span style={{ fontSize: '0.95rem', color: '#4b5563' }}>
-                      {formData.discount_type === 'none' ? 'None' : `${formData.discount_value}${formData.discount_type === 'percentage' ? '%' : '$'}`}
+                      {formData.discount_type === 'none' ? 'None' : `${formData.discount_type === 'flat' ? '₹' : ''}${formData.discount_value}${formData.discount_type === 'percentage' ? '%' : ''}`}
                     </span>
                   </div>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Stock Qty</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Stock Qty</span>
                     <span style={{ fontSize: '1rem', fontWeight: '600', color: parseInt(formData.stock_quantity) > parseInt(formData.low_stock_limit) ? '#059669' : '#dc2626' }}>
                       {formData.stock_quantity}
                     </span>
                   </div>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Availability</span>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Availability</span>
                     <span style={{ fontSize: '0.95rem', color: formData.is_available ? '#059669' : '#4b5563', fontWeight: '600' }}>
                       {formData.is_available ? 'Available' : 'Unavailable'}
                     </span>
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  <button type="button" onClick={closeModal} className="admin-btn admin-btn-secondary" style={{ padding: '10px 24px', borderRadius: '8px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#374151', border: 'none' }}>Close Profile</button>
                 </div>
               </div>
             ) : (
@@ -423,13 +391,13 @@ const AdminVariants = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Select Product <span style={{color: '#ef4444'}}>*</span></label>
+                    <label className="admin-label">Select Product <span style={{color: '#ef4444'}}>*</span></label>
                     <select 
                       name="product_id" 
                       value={formData.product_id} 
                       onChange={handleInputChange}
                       required
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     >
                       <option value="" disabled>Choose a product</option>
                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -437,28 +405,28 @@ const AdminVariants = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>SKU <span style={{color: '#ef4444'}}>*</span></label>
+                    <label className="admin-label">SKU <span style={{color: '#ef4444'}}>*</span></label>
                     <input 
                       type="text" name="sku" value={formData.sku} onChange={handleInputChange} required
                       placeholder="e.g. SAREE-RED-M"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Variant Name</label>
+                    <label className="admin-label">Variant Name</label>
                     <input 
                       type="text" name="variant_name" value={formData.variant_name} onChange={handleInputChange} 
                       placeholder="Optional display name"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Size</label>
+                    <label className="admin-label">Size</label>
                     <select 
                       name="size_id" value={formData.size_id} onChange={handleInputChange}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     >
                       <option value="">No specific size</option>
                       {sizes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -466,10 +434,10 @@ const AdminVariants = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Colour</label>
+                    <label className="admin-label">Colour</label>
                     <select 
                       name="color_id" value={formData.color_id} onChange={handleInputChange}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     >
                       <option value="">No specific colour</option>
                       {colours.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -477,55 +445,56 @@ const AdminVariants = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Original Price ($) <span style={{color: '#ef4444'}}>*</span></label>
+                    <label className="admin-label">Original Price (₹) <span style={{color: '#ef4444'}}>*</span></label>
                     <input 
                       type="number" step="0.01" name="original_price" value={formData.original_price} onChange={handleInputChange} required
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Discount</label>
+                      <label className="admin-label">Discount</label>
                       <select 
                         name="discount_type" value={formData.discount_type} onChange={handleInputChange}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                        className="admin-input"
                       >
                         <option value="none">None</option>
                         <option value="percentage">%</option>
-                        <option value="flat">Flat ($)</option>
+                        <option value="flat">Flat (₹)</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Value</label>
+                      <label className="admin-label">Value</label>
                       <input 
                         type="number" step="0.01" name="discount_value" value={formData.discount_value} onChange={handleInputChange} disabled={formData.discount_type === 'none'}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', backgroundColor: formData.discount_type === 'none' ? '#f3f4f6' : '#fff' }}
+                        className="admin-input"
+                        style={{ backgroundColor: formData.discount_type === 'none' ? '#f3f4f6' : '#fff' }}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Stock Quantity <span style={{color: '#ef4444'}}>*</span></label>
+                    <label className="admin-label">Stock Quantity <span style={{color: '#ef4444'}}>*</span></label>
                     <input 
                       type="number" name="stock_quantity" value={formData.stock_quantity} onChange={handleInputChange} required min="0"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                      className="admin-input"
                     />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Reserved</label>
+                      <label className="admin-label">Reserved</label>
                       <input 
                         type="number" name="reserved_quantity" value={formData.reserved_quantity} onChange={handleInputChange} min="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                        className="admin-input"
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Low Limit</label>
+                      <label className="admin-label">Low Limit</label>
                       <input 
                         type="number" name="low_stock_limit" value={formData.low_stock_limit} onChange={handleInputChange} min="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none' }}
+                        className="admin-input"
                       />
                     </div>
                   </div>
@@ -539,7 +508,7 @@ const AdminVariants = () => {
 
                   {modalMode === 'add' && (
                     <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Variant Images (Max 10)</label>
+                      <label className="admin-label">Variant Images (Max 10)</label>
                       <div style={{ border: '2px dashed #d1d5db', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#f9fafb' }}>
                         <input 
                           type="file" 
@@ -554,15 +523,34 @@ const AdminVariants = () => {
                   )}
 
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                  <button type="button" onClick={closeModal} style={{ padding: '10px 20px', borderRadius: '8px', fontWeight: '600', border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#374151', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ padding: '10px 24px', borderRadius: '8px', fontWeight: '600', backgroundColor: '#A049A3', border: 'none', color: '#fff', cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {isSaving ? 'Saving...' : 'Save Variant'}
-                  </button>
-                </div>
               </form>
             )}
+            </div>
+
+            <div className="admin-modal-footer">
+              <button type="button" onClick={closeModal} className="admin-btn admin-btn-secondary">
+                {isReadOnly ? 'Close' : 'Cancel'}
+              </button>
+              {!isReadOnly && (
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  onClick={handleSubmit}
+                  className="admin-btn admin-btn-primary"
+                  style={{ opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Variant'
+                  )}
+                </button>
+              )}
+            </div>
+            
           </div>
         </div>
       )}

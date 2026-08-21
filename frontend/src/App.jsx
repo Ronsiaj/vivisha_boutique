@@ -27,6 +27,7 @@ import AdminPlaceholder from './pages/admin/AdminPlaceholder.jsx';
 import AdminCategories from './pages/admin/AdminCategories.jsx';
 import AdminProducts from './pages/admin/AdminProducts.jsx';
 import AdminVariants from './pages/admin/AdminVariants.jsx';
+import AdminUsers from './pages/admin/AdminUsers.jsx';
 
 import CustomerProfile from './pages/CustomerProfile.jsx';
 
@@ -102,7 +103,7 @@ function App() {
                 <Route path="purchases" element={<AdminPlaceholder moduleKey="purchases" />} />
                 <Route path="pos" element={<AdminPlaceholder moduleKey="pos" />} />
                 <Route path="orders" element={<AdminPlaceholder moduleKey="orders" />} />
-                <Route path="customers" element={<AdminPlaceholder moduleKey="customers" />} />
+                <Route path="customers" element={<AdminUsers />} />
                 <Route path="payments" element={<AdminPlaceholder moduleKey="payments" />} />
                 <Route path="returns" element={<AdminPlaceholder moduleKey="returns" />} />
                 <Route path="whatsapp" element={<AdminPlaceholder moduleKey="whatsapp" />} />

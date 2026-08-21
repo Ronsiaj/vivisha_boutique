@@ -181,7 +181,7 @@ const AdminProducts = () => {
           <p className="admin-module-desc">Manage products, assignments, and base information.</p>
         </div>
         <div className="admin-header-actions">
-          <button className="admin-btn admin-btn-primary" onClick={() => openModal('add')} style={{ backgroundColor: '#A049A3' }}>
+          <button className="admin-btn admin-btn-primary" onClick={() => openModal('add')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -197,19 +197,19 @@ const AdminProducts = () => {
         </div>
       )}
 
-      <div className="admin-card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #f3f4f6', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+      <div className="admin-premium-card" style={{ padding: '0', overflow: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading products...</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="admin-table-container">
+            <table className="admin-table">
               <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Name</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Category</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Tags</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem' }}>Status</th>
-                  <th style={{ padding: '16px', fontWeight: '600', color: '#4b5563', fontSize: '0.875rem', textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Tags</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,35 +221,25 @@ const AdminProducts = () => {
                   </tr>
                 ) : (
                   products.map(prod => (
-                    <tr key={prod.id} style={{ borderBottom: '1px solid #e5e7eb', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fdfafc'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                      <td style={{ padding: '12px 16px', fontWeight: '500', color: '#1f2937' }}>{prod.name}</td>
-                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '0.875rem' }}>{prod.category?.name || 'N/A'}</td>
-                      <td style={{ padding: '12px 16px' }}>
+                    <tr key={prod.id}>
+                      <td style={{ fontWeight: '600', color: '#111827' }}>{prod.name}</td>
+                      <td>{prod.category?.name || 'N/A'}</td>
+                      <td>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {prod.is_new_arrival === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#e0e7ff', color: '#3730a3', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>NEW</span>}
                           {prod.is_featured === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#fef08a', color: '#854d0e', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>FEATURED</span>}
                           {prod.is_best_seller === 1 && <span style={{ padding: '2px 6px', backgroundColor: '#fce7f3', color: '#be185d', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' }}>BEST SELLER</span>}
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ 
-                          padding: '4px 10px', 
-                          borderRadius: '9999px', 
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          backgroundColor: prod.status === 'active' ? '#dcfce7' : '#f3f4f6',
-                          color: prod.status === 'active' ? '#166534' : '#4b5563',
-                          border: prod.status === 'active' ? '1px solid #bbf7d0' : '1px solid #e5e7eb'
-                        }}>
-                          {prod.status.charAt(0).toUpperCase() + prod.status.slice(1)}
+                      <td>
+                        <span className={`admin-badge ${prod.status === 'active' ? 'admin-badge-active' : 'admin-badge-inactive'}`}>
+                          {prod.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
+                      <td style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
                         <button 
                           onClick={() => openModal('view', prod)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#4b5563', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
-                          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.backgroundColor = '#e5e7eb'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+                          className="admin-action-btn admin-action-view"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -259,9 +249,7 @@ const AdminProducts = () => {
                         </button>
                         <button 
                           onClick={() => openModal('edit', prod)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fdf2f8', border: '1px solid #fbcfe8', color: '#A049A3', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
-                          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#f9a8d4'; e.currentTarget.style.backgroundColor = '#fce7f3'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#fbcfe8'; e.currentTarget.style.backgroundColor = '#fdf2f8'; }}
+                          className="admin-action-btn admin-action-edit"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -281,32 +269,18 @@ const AdminProducts = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, 
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-          boxSizing: 'border-box'
-        }}>
-          <div className="admin-card" style={{ 
-            width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', 
-            padding: '24px', position: 'relative', borderRadius: '16px',
-            boxSizing: 'border-box', backgroundColor: '#ffffff',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-          }}>
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-content" style={{ maxWidth: '600px' }}>
+            <div className="admin-modal-header">
+              <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#111827', fontWeight: '700' }}>
+                {modalMode === 'add' ? 'Add New Product' : modalMode === 'edit' ? 'Edit Product' : 'Product Details'}
+              </h2>
+              <button onClick={closeModal} className="admin-modal-close">
+                &times;
+              </button>
+            </div>
             
-            <button 
-              onClick={closeModal}
-              style={{ position: 'absolute', top: '20px', right: '20px', background: '#f3f4f6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', color: '#6b7280', transition: 'background 0.2s' }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-            >
-              &times;
-            </button>
-            
-            <h2 style={{ marginBottom: '24px', fontSize: '1.25rem', color: '#111827', fontWeight: '700', paddingRight: '40px' }}>
-              {modalMode === 'add' ? 'Add New Product' : modalMode === 'edit' ? 'Edit Product' : 'Product Details'}
-            </h2>
+            <div className="admin-modal-body">
 
             {error && (
               <div style={{ marginBottom: '20px', padding: '12px 16px', backgroundColor: '#fdf2f8', color: '#9d174d', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid #fbcfe8', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -317,48 +291,37 @@ const AdminProducts = () => {
 
             {isReadOnly ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Product Name</span>
-                    <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827' }}>{formData.name}</span>
+                <div className="admin-info-grid">
+                  <div className="admin-info-box" style={{ gridColumn: '1 / -1' }}>
+                    <span className="admin-info-label">Product Name</span>
+                    <span className="admin-info-value">{formData.name}</span>
                   </div>
                   
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                      <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Category</span>
-                      <span style={{ fontSize: '0.9rem', color: '#374151', fontWeight: '500' }}>
-                        {categories.find(c => c.id === parseInt(formData.category_id))?.name || 'N/A'}
-                      </span>
-                    </div>
-                    <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                      <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Status</span>
-                      <span style={{ 
-                            display: 'inline-block',
-                            padding: '4px 12px', 
-                            borderRadius: '9999px', 
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            backgroundColor: formData.status === 'active' ? '#dcfce7' : '#f3f4f6',
-                            color: formData.status === 'active' ? '#166534' : '#4b5563',
-                            border: formData.status === 'active' ? '1px solid #bbf7d0' : '1px solid #e5e7eb'
-                          }}>
-                            {formData.status.charAt(0).toUpperCase() + formData.status.slice(1)}
-                      </span>
-                    </div>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Category</span>
+                    <span style={{ fontSize: '0.9rem', color: '#374151', fontWeight: '500' }}>
+                      {categories.find(c => c.id === parseInt(formData.category_id))?.name || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="admin-info-box">
+                    <span className="admin-info-label">Status</span>
+                    <span className={`admin-badge ${formData.status === 'active' ? 'admin-badge-active' : 'admin-badge-inactive'}`}>
+                      {formData.status}
+                    </span>
                   </div>
 
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Slug / URL</span>
+                  <div className="admin-info-box" style={{ gridColumn: '1 / -1' }}>
+                    <span className="admin-info-label">Slug / URL</span>
                     <span style={{ fontSize: '0.9rem', color: '#4b5563', fontFamily: 'monospace', backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>{formData.slug || 'N/A'}</span>
                   </div>
 
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Description</span>
+                  <div className="admin-info-box" style={{ gridColumn: '1 / -1' }}>
+                    <span className="admin-info-label">Description</span>
                     <span style={{ fontSize: '0.9rem', color: '#4b5563', lineHeight: '1.5' }}>{formData.description || <em style={{color: '#9ca3af'}}>No description provided.</em>}</span>
                   </div>
 
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #f3f4f6' }}>
-                    <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Product Tags</span>
+                  <div className="admin-info-box" style={{ gridColumn: '1 / -1' }}>
+                    <span className="admin-info-label">Product Tags</span>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: formData.is_new_arrival ? '#e0e7ff' : '#f3f4f6', color: formData.is_new_arrival ? '#3730a3' : '#9ca3af' }}>New Arrival</span>
                       <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: formData.is_featured ? '#fef08a' : '#f3f4f6', color: formData.is_featured ? '#854d0e' : '#9ca3af' }}>Featured</span>
@@ -366,24 +329,13 @@ const AdminProducts = () => {
                     </div>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  <button 
-                    type="button" 
-                    onClick={closeModal}
-                    className="admin-btn admin-btn-secondary"
-                    style={{ padding: '10px 24px', borderRadius: '8px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#374151', border: 'none' }}
-                  >
-                    Close Profile
-                  </button>
-                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                   
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Product Name <span style={{color: '#ef4444'}}>*</span></label>
+                    <label className="admin-label">Product Name <span style={{color: '#ef4444'}}>*</span></label>
                     <input 
                       type="text" 
                       name="name" 
@@ -391,23 +343,20 @@ const AdminProducts = () => {
                       onChange={handleInputChange} 
                       required
                       placeholder="E.g., Red Banarasi Saree"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s' }}
-                      onFocus={(e) => e.target.style.borderColor = '#A049A3'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                      className="admin-input"
                     />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Category <span style={{color: '#ef4444'}}>*</span></label>
+                      <label className="admin-label">Category <span style={{color: '#ef4444'}}>*</span></label>
                       <select 
                         name="category_id" 
                         value={formData.category_id} 
                         onChange={handleInputChange}
                         required
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', backgroundColor: '#fff', transition: 'border-color 0.2s', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'3 5 8 10 13 5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
-                        onFocus={(e) => e.target.style.borderColor = '#A049A3'}
-                        onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                        className="admin-input"
+                        style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'3 5 8 10 13 5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
                       >
                         <option value="" disabled>Select Category</option>
                         {categories.map(cat => (
@@ -416,14 +365,13 @@ const AdminProducts = () => {
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Status</label>
+                      <label className="admin-label">Status</label>
                       <select 
                         name="status" 
                         value={formData.status} 
                         onChange={handleInputChange}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', backgroundColor: '#fff', transition: 'border-color 0.2s', appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'3 5 8 10 13 5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
-                        onFocus={(e) => e.target.style.borderColor = '#A049A3'}
-                        onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                        className="admin-input"
+                        style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'3 5 8 10 13 5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -432,35 +380,31 @@ const AdminProducts = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Slug URL <span style={{fontWeight: '400', color: '#9ca3af'}}>(Optional)</span></label>
+                    <label className="admin-label">Slug URL <span style={{fontWeight: '400', color: '#9ca3af'}}>(Optional)</span></label>
                     <input 
                       type="text" 
                       name="slug" 
                       value={formData.slug} 
                       onChange={handleInputChange} 
                       placeholder="Auto-generated if left blank"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s' }}
-                      onFocus={(e) => e.target.style.borderColor = '#A049A3'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                      className="admin-input"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Description</label>
+                    <label className="admin-label">Description</label>
                     <textarea 
                       name="description" 
                       value={formData.description} 
                       onChange={handleInputChange} 
                       rows="3"
                       placeholder="Brief description about this product..."
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.95rem', outline: 'none', resize: 'vertical', transition: 'border-color 0.2s' }}
-                      onFocus={(e) => e.target.style.borderColor = '#A049A3'}
-                      onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                      className="admin-input"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>Product Tags / Badges</label>
+                    <label className="admin-label">Product Tags / Badges</label>
                     <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', backgroundColor: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: '500', color: '#4b5563', cursor: 'pointer' }}>
                         <input type="checkbox" name="is_new_arrival" checked={formData.is_new_arrival} onChange={handleInputChange} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
@@ -478,37 +422,34 @@ const AdminProducts = () => {
                   </div>
 
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                  <button 
-                    type="button" 
-                    onClick={closeModal}
-                    style={{ padding: '10px 20px', borderRadius: '8px', fontWeight: '600', border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#374151', cursor: 'pointer', transition: 'background 0.2s' }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#f9fafb'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#fff'}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={isSaving}
-                    style={{ padding: '10px 24px', borderRadius: '8px', fontWeight: '600', backgroundColor: '#A049A3', border: 'none', color: '#fff', cursor: isSaving ? 'not-allowed' : 'pointer', transition: 'background 0.2s', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}
-                    onMouseOver={(e) => { if(!isSaving) e.currentTarget.style.backgroundColor = '#823b84'; }}
-                    onMouseOut={(e) => { if(!isSaving) e.currentTarget.style.backgroundColor = '#A049A3'; }}
-                  >
-                    {isSaving ? (
-                      <>
-                        <svg className="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Product'
-                    )}
-                    <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-                  </button>
-                </div>
               </form>
             )}
+            </div>
+
+            <div className="admin-modal-footer">
+              <button type="button" onClick={closeModal} className="admin-btn admin-btn-secondary">
+                {isReadOnly ? 'Close' : 'Cancel'}
+              </button>
+              {!isReadOnly && (
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  onClick={handleSubmit}
+                  className="admin-btn admin-btn-primary"
+                  style={{ opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Product'
+                  )}
+                </button>
+              )}
+            </div>
+            
           </div>
         </div>
       )}

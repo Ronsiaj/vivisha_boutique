@@ -28,9 +28,19 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    let processedValue = type === 'checkbox' ? checked : value;
+    
+    if (name === 'mobile') {
+      processedValue = processedValue.replace(/\D/g, '');
+      if (processedValue.length > 10) {
+        processedValue = processedValue.slice(0, 10);
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: processedValue
     }));
     if (error) setError('');
   };
@@ -164,6 +174,7 @@ const Register = () => {
                 placeholder="10-digit mobile number"
                 value={formData.mobile}
                 onChange={handleChange}
+                maxLength="10"
                 required
               />
             </div>

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 19, 2026 at 02:43 PM
+-- Generation Time: Aug 20, 2026 at 02:06 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -170,6 +170,36 @@ INSERT INTO `colors` (`id`, `name`, `hex_code`, `status`, `created_at`, `updated
 (29, 'Silver', '#C0C0C0', 'active', '2026-08-18 08:28:44', '2026-08-18 08:28:44'),
 (30, 'Gold', '#FFD700', 'active', '2026-08-18 08:28:44', '2026-08-18 08:28:44'),
 (31, 'Dark Red', '#8B0000', 'active', '2026-08-18 08:48:27', '2026-08-18 08:48:27');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `email_password_reset_otps`
+--
+
+CREATE TABLE `email_password_reset_otps` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `otp_hash` varchar(255) NOT NULL,
+  `attempts` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
+  `max_attempts` tinyint(3) UNSIGNED NOT NULL DEFAULT 5,
+  `expires_at` datetime NOT NULL,
+  `verified_at` datetime DEFAULT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `status` enum('pending','verified','used','expired','blocked') NOT NULL DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `email_password_reset_otps`
+--
+
+INSERT INTO `email_password_reset_otps` (`id`, `user_id`, `email`, `otp_hash`, `attempts`, `max_attempts`, `expires_at`, `verified_at`, `used_at`, `status`, `created_at`, `updated_at`) VALUES
+(1, 1, 'ragulthulasi82@gmail.com', '$2y$10$q0cgVw1UC98JrY/Bx/BeW.d88cmNtoeobpKbcHoJd2DtKkm6eUbTC', 0, 5, '2026-08-20 13:50:51', '2026-08-20 17:20:04', NULL, 'expired', '2026-08-20 11:45:51', '2026-08-20 11:57:24'),
+(2, 1, 'ragulthulasi82@gmail.com', '$2y$10$OY7hTC6bKvSrmMiYvmUp0OncsTRmvlJjJuk7hTnmORz4kImb/ttLm', 0, 5, '2026-08-20 14:02:58', NULL, NULL, 'expired', '2026-08-20 11:57:58', '2026-08-20 11:59:32'),
+(3, 1, 'ragulthulasi82@gmail.com', '$2y$10$/1hNz1Si7kLm5cMpWn8hkOZqHhPlhnaIP27ukQbeA.HDd6RloW8GK', 0, 5, '2026-08-20 14:04:32', '2026-08-20 17:31:58', '2026-08-20 17:32:23', 'used', '2026-08-20 11:59:32', '2026-08-20 12:02:23');
 
 -- --------------------------------------------------------
 
@@ -343,7 +373,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `mobile`, `email`, `password`, `date_of_birth`, `status`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'Sriram', '9876543211', 'sriram@gmail.com', '$2y$10$dCWBFyMQh68YZn4jwCjeOOrLmEDbSVrErDOIdzq.K4GWG3EASqcNu', '2000-05-15', 'active', '2026-08-19 15:08:24', '2026-08-14 13:56:26', '2026-08-19 09:38:24'),
+(1, 'Ragul Raj', '7418024669', 'ragulthulasi82@gmail.com', '$2y$10$cjWIm8pGTgvZhW5ZSePB1uqNSzu7oQh7fhsZOgLqe1cvCnwJ372Ua', '2000-05-15', 'active', '2026-08-20 17:34:07', '2026-08-14 13:56:26', '2026-08-20 12:04:07'),
 (2, 'Ragul', '9876543111', 'ragul@gmail.com', '$2y$10$G3iJeLhNw4Os0.I8e9i6LOxX0eRTKVgvK1NM.RJT4OAGMN/UFlNYu', '2000-06-15', 'active', '2026-08-19 15:05:54', '2026-08-14 13:57:34', '2026-08-19 09:35:54'),
 (3, 'Siva', '9876541111', 'siva@gmail.com', '$2y$10$oAxDrB5ZEf33LFosm12dR.9zXej5yEzf0Upf2DVJfwr.5jfcHsw7q', '2000-06-15', 'active', '2026-08-18 12:18:32', '2026-08-18 06:47:47', '2026-08-18 06:48:32');
 
@@ -378,6 +408,28 @@ CREATE TABLE `user_addresses` (
 INSERT INTO `user_addresses` (`id`, `user_id`, `address_type`, `door_no`, `street`, `area`, `city`, `district`, `state`, `pincode`, `landmark`, `is_default`, `status`, `created_at`, `updated_at`) VALUES
 (1, 1, 'home', '21', 'Thirukurippu Street', 'Burma colony', 'Karaikudi', 'Sivagangai', 'Tamil Nadu', '630005', 'Near Leader School', 1, 'active', '2026-08-18 07:27:31', '2026-08-18 07:47:24'),
 (2, 1, 'work', '13', 'Thirukurippu Street', 'water colony', 'madurai', 'madurai', 'Tamil Nadu', '630102', 'Near Leader School', 0, 'active', '2026-08-18 07:36:46', '2026-08-18 07:48:27');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `wishlists`
+--
+
+CREATE TABLE `wishlists` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `product_id` bigint(20) UNSIGNED NOT NULL,
+  `variant_id` bigint(20) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `wishlists`
+--
+
+INSERT INTO `wishlists` (`id`, `user_id`, `product_id`, `variant_id`, `created_at`, `updated_at`) VALUES
+(2, 1, 1, 1, '2026-08-20 06:42:56', '2026-08-20 06:42:56');
 
 --
 -- Indexes for dumped tables
@@ -421,6 +473,16 @@ ALTER TABLE `categories`
 ALTER TABLE `colors`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `email_password_reset_otps`
+--
+ALTER TABLE `email_password_reset_otps`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_email_reset_user` (`user_id`),
+  ADD KEY `idx_email_reset_email` (`email`),
+  ADD KEY `idx_email_reset_status` (`status`),
+  ADD KEY `idx_email_reset_expiry` (`expires_at`);
 
 --
 -- Indexes for table `inventory_transactions`
@@ -487,6 +549,17 @@ ALTER TABLE `user_addresses`
   ADD KEY `idx_user_addresses_user_id` (`user_id`);
 
 --
+-- Indexes for table `wishlists`
+--
+ALTER TABLE `wishlists`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_wishlist_user_variant` (`user_id`,`variant_id`),
+  ADD KEY `idx_wishlist_user_id` (`user_id`),
+  ADD KEY `idx_wishlist_product_id` (`product_id`),
+  ADD KEY `idx_wishlist_variant_id` (`variant_id`),
+  ADD KEY `idx_wishlist_created_at` (`created_at`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -519,6 +592,12 @@ ALTER TABLE `categories`
 --
 ALTER TABLE `colors`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+
+--
+-- AUTO_INCREMENT for table `email_password_reset_otps`
+--
+ALTER TABLE `email_password_reset_otps`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `inventory_transactions`
@@ -563,6 +642,12 @@ ALTER TABLE `user_addresses`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `wishlists`
+--
+ALTER TABLE `wishlists`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
 -- Constraints for dumped tables
 --
 
@@ -579,6 +664,12 @@ ALTER TABLE `cart_items`
   ADD CONSTRAINT `fk_cart_items_cart` FOREIGN KEY (`cart_id`) REFERENCES `carts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_cart_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_cart_items_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `email_password_reset_otps`
+--
+ALTER TABLE `email_password_reset_otps`
+  ADD CONSTRAINT `fk_email_reset_otp_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `inventory_transactions`
@@ -612,6 +703,14 @@ ALTER TABLE `product_variant_images`
 --
 ALTER TABLE `user_addresses`
   ADD CONSTRAINT `fk_user_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Constraints for table `wishlists`
+--
+ALTER TABLE `wishlists`
+  ADD CONSTRAINT `fk_wishlists_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_wishlists_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_wishlists_variant` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

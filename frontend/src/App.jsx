@@ -24,6 +24,9 @@ import Register from './pages/auth/Register.jsx';
 // Admin Panel Imports
 import AdminLayout from './layouts/AdminLayout.jsx';
 import AdminPlaceholder from './pages/admin/AdminPlaceholder.jsx';
+import AdminCategories from './pages/admin/AdminCategories.jsx';
+import AdminProducts from './pages/admin/AdminProducts.jsx';
+import AdminVariants from './pages/admin/AdminVariants.jsx';
 
 import CustomerProfile from './pages/CustomerProfile.jsx';
 
@@ -91,8 +94,9 @@ function App() {
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminPlaceholder moduleKey="dashboard" />} />
                 <Route path="reports" element={<AdminPlaceholder moduleKey="reports" />} />
-                <Route path="products" element={<AdminPlaceholder moduleKey="products" />} />
-                <Route path="categories" element={<AdminPlaceholder moduleKey="categories" />} />
+                <Route path="products" element={<AdminProducts />} />
+                <Route path="variants" element={<AdminVariants />} />
+                <Route path="categories" element={<AdminCategories />} />
                 <Route path="banners-coupons" element={<AdminPlaceholder moduleKey="banners-coupons" />} />
                 <Route path="suppliers" element={<AdminPlaceholder moduleKey="suppliers" />} />
                 <Route path="purchases" element={<AdminPlaceholder moduleKey="purchases" />} />

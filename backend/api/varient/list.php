@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../config/jwt.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('X-Content-Type-Options: nosniff');
@@ -12,7 +11,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -21,32 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendResponse(false, 'Only GET method is allowed.', null, 405);
-}
-
-$decoded = authenticate();
-validateJWTData($decoded);
-
-$accountType = getAuthenticatedType($decoded);
-$authenticatedId = getAuthenticatedId($decoded);
-
-if ($authenticatedId <= 0) {
-    sendResponse(false, 'Invalid authenticated account.', null, 401);
-}
-
-if (!in_array($accountType, ['admin', 'user'], true)) {
-    sendResponse(false, 'Invalid account type.', null, 403);
-}
-
-if ($accountType === 'admin') {
-    $adminAuth = authenticateAdmin();
-    checkAdminRole($adminAuth, ['admin']);
-} else {
-    $userAuth = authenticateUser();
-    $userId = getAuthenticatedId($userAuth);
-
-    if ($userId <= 0) {
-        sendResponse(false, 'Invalid authenticated user.', null, 401);
-    }
 }
 
 function validatePositiveIdFilter(string $value, string $field): ?int
@@ -79,6 +52,7 @@ function validateBooleanFilter(string $value, string $field): ?int
     }
 
     sendResponse(false, "{$field} must be 0, 1, true or false.", null, 422);
+
     return null;
 }
 
@@ -126,45 +100,30 @@ if ($q !== '' && mb_strlen($q) > 200) {
     sendResponse(false, 'Search query must not exceed 200 characters.', null, 422);
 }
 
-$variantIdInput = isset($_GET['variant_id']) ? trim((string)$_GET['variant_id']) : '';
-$productIdInput = isset($_GET['product_id']) ? trim((string)$_GET['product_id']) : '';
-$categoryIdInput = isset($_GET['category_id']) ? trim((string)$_GET['category_id']) : '';
-$sizeIdInput = isset($_GET['size_id']) ? trim((string)$_GET['size_id']) : '';
-$colorIdInput = isset($_GET['color_id']) ? trim((string)$_GET['color_id']) : '';
+$variantId = validatePositiveIdFilter(
+    isset($_GET['variant_id']) ? trim((string)$_GET['variant_id']) : '',
+    'variant_id'
+);
 
-$variantId = validatePositiveIdFilter($variantIdInput, 'variant_id');
-$productId = validatePositiveIdFilter($productIdInput, 'product_id');
-$categoryId = validatePositiveIdFilter($categoryIdInput, 'category_id');
-$sizeId = validatePositiveIdFilter($sizeIdInput, 'size_id');
-$colorId = validatePositiveIdFilter($colorIdInput, 'color_id');
+$productId = validatePositiveIdFilter(
+    isset($_GET['product_id']) ? trim((string)$_GET['product_id']) : '',
+    'product_id'
+);
 
-$productStatus = isset($_GET['product_status'])
-    ? strtolower(trim((string)$_GET['product_status']))
-    : '';
+$categoryId = validatePositiveIdFilter(
+    isset($_GET['category_id']) ? trim((string)$_GET['category_id']) : '',
+    'category_id'
+);
 
-$imageStatus = isset($_GET['image_status'])
-    ? strtolower(trim((string)$_GET['image_status']))
-    : '';
+$sizeId = validatePositiveIdFilter(
+    isset($_GET['size_id']) ? trim((string)$_GET['size_id']) : '',
+    'size_id'
+);
 
-$allowedStatuses = ['active', 'inactive'];
-
-if (
-    $productStatus !== '' &&
-    !in_array($productStatus, $allowedStatuses, true)
-) {
-    sendResponse(false, 'Invalid product_status.', [
-        'allowed_statuses' => $allowedStatuses
-    ], 422);
-}
-
-if (
-    $imageStatus !== '' &&
-    !in_array($imageStatus, $allowedStatuses, true)
-) {
-    sendResponse(false, 'Invalid image_status.', [
-        'allowed_statuses' => $allowedStatuses
-    ], 422);
-}
+$colorId = validatePositiveIdFilter(
+    isset($_GET['color_id']) ? trim((string)$_GET['color_id']) : '',
+    'color_id'
+);
 
 $discountType = isset($_GET['discount_type'])
     ? strtolower(trim((string)$_GET['discount_type']))
@@ -172,85 +131,48 @@ $discountType = isset($_GET['discount_type'])
 
 $allowedDiscountTypes = ['none', 'percentage', 'flat'];
 
-if (
-    $discountType !== '' &&
-    !in_array($discountType, $allowedDiscountTypes, true)
-) {
+if ($discountType !== '' && !in_array($discountType, $allowedDiscountTypes, true)) {
     sendResponse(false, 'Invalid discount_type.', [
         'allowed_discount_types' => $allowedDiscountTypes
     ], 422);
 }
 
-$isAvailableInput = isset($_GET['is_available'])
-    ? trim((string)$_GET['is_available'])
-    : '';
-
-$isAvailable = validateBooleanFilter(
-    $isAvailableInput,
-    'is_available'
-);
-
-$isNewArrivalInput = isset($_GET['is_new_arrival'])
-    ? trim((string)$_GET['is_new_arrival'])
-    : '';
-
-$isFeaturedInput = isset($_GET['is_featured'])
-    ? trim((string)$_GET['is_featured'])
-    : '';
-
-$isBestSellerInput = isset($_GET['is_best_seller'])
-    ? trim((string)$_GET['is_best_seller'])
-    : '';
-
 $isNewArrival = validateBooleanFilter(
-    $isNewArrivalInput,
+    isset($_GET['is_new_arrival']) ? trim((string)$_GET['is_new_arrival']) : '',
     'is_new_arrival'
 );
 
 $isFeatured = validateBooleanFilter(
-    $isFeaturedInput,
+    isset($_GET['is_featured']) ? trim((string)$_GET['is_featured']) : '',
     'is_featured'
 );
 
 $isBestSeller = validateBooleanFilter(
-    $isBestSellerInput,
+    isset($_GET['is_best_seller']) ? trim((string)$_GET['is_best_seller']) : '',
     'is_best_seller'
 );
 
-$minPriceInput = isset($_GET['min_price'])
-    ? trim((string)$_GET['min_price'])
-    : '';
+$minPrice = validatePriceFilter(
+    isset($_GET['min_price']) ? trim((string)$_GET['min_price']) : '',
+    'min_price'
+);
 
-$maxPriceInput = isset($_GET['max_price'])
-    ? trim((string)$_GET['max_price'])
-    : '';
-
-$minOriginalPriceInput = isset($_GET['min_original_price'])
-    ? trim((string)$_GET['min_original_price'])
-    : '';
-
-$maxOriginalPriceInput = isset($_GET['max_original_price'])
-    ? trim((string)$_GET['max_original_price'])
-    : '';
-
-$minPrice = validatePriceFilter($minPriceInput, 'min_price');
-$maxPrice = validatePriceFilter($maxPriceInput, 'max_price');
+$maxPrice = validatePriceFilter(
+    isset($_GET['max_price']) ? trim((string)$_GET['max_price']) : '',
+    'max_price'
+);
 
 $minOriginalPrice = validatePriceFilter(
-    $minOriginalPriceInput,
+    isset($_GET['min_original_price']) ? trim((string)$_GET['min_original_price']) : '',
     'min_original_price'
 );
 
 $maxOriginalPrice = validatePriceFilter(
-    $maxOriginalPriceInput,
+    isset($_GET['max_original_price']) ? trim((string)$_GET['max_original_price']) : '',
     'max_original_price'
 );
 
-if (
-    $minPrice !== null &&
-    $maxPrice !== null &&
-    $minPrice > $maxPrice
-) {
+if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
     sendResponse(false, 'min_price cannot be greater than max_price.', null, 422);
 }
 
@@ -277,10 +199,7 @@ $allowedStockStatuses = [
     'low_stock'
 ];
 
-if (
-    $stockStatus !== '' &&
-    !in_array($stockStatus, $allowedStockStatuses, true)
-) {
+if ($stockStatus !== '' && !in_array($stockStatus, $allowedStockStatuses, true)) {
     sendResponse(false, 'Invalid stock_status.', [
         'allowed_stock_statuses' => $allowedStockStatuses
     ], 422);
@@ -297,11 +216,7 @@ $createdTo = isset($_GET['created_to'])
 validateDateFilter($createdFrom, 'created_from');
 validateDateFilter($createdTo, 'created_to');
 
-if (
-    $createdFrom !== '' &&
-    $createdTo !== '' &&
-    $createdFrom > $createdTo
-) {
+if ($createdFrom !== '' && $createdTo !== '' && $createdFrom > $createdTo) {
     sendResponse(false, 'created_from cannot be greater than created_to.', null, 422);
 }
 
@@ -341,7 +256,6 @@ $allowedSortColumns = [
     'stock_quantity' => 'pv.stock_quantity',
     'reserved_quantity' => 'pv.reserved_quantity',
     'low_stock_limit' => 'pv.low_stock_limit',
-    'is_available' => 'pv.is_available',
     'created_at' => 'pv.created_at',
     'updated_at' => 'pv.updated_at',
     'product_name' => 'p.name',
@@ -371,14 +285,13 @@ if (!in_array($sortOrder, ['asc', 'desc'], true)) {
 $sortColumn = $allowedSortColumns[$sortBy];
 
 try {
-    $where = [];
-    $params = [];
+    $where = [
+        "p.status = 'active'",
+        "c.status = 'active'",
+        "pv.is_available = 1"
+    ];
 
-    if ($accountType === 'user') {
-        $where[] = "p.status = 'active'";
-        $where[] = "pv.is_available = 1";
-        $where[] = "c.status = 'active'";
-    }
+    $params = [];
 
     if ($variantId !== null) {
         $where[] = 'pv.id = :variant_id';
@@ -405,19 +318,9 @@ try {
         $params[':color_id'] = $colorId;
     }
 
-    if ($productStatus !== '') {
-        $where[] = 'p.status = :product_status';
-        $params[':product_status'] = $productStatus;
-    }
-
     if ($discountType !== '') {
         $where[] = 'pv.discount_type = :discount_type';
         $params[':discount_type'] = $discountType;
-    }
-
-    if ($isAvailable !== null) {
-        $where[] = 'pv.is_available = :is_available';
-        $params[':is_available'] = $isAvailable;
     }
 
     if ($isNewArrival !== null) {
@@ -447,22 +350,12 @@ try {
 
     if ($minOriginalPrice !== null) {
         $where[] = 'pv.original_price >= :min_original_price';
-        $params[':min_original_price'] = number_format(
-            $minOriginalPrice,
-            2,
-            '.',
-            ''
-        );
+        $params[':min_original_price'] = number_format($minOriginalPrice, 2, '.', '');
     }
 
     if ($maxOriginalPrice !== null) {
         $where[] = 'pv.original_price <= :max_original_price';
-        $params[':max_original_price'] = number_format(
-            $maxOriginalPrice,
-            2,
-            '.',
-            ''
-        );
+        $params[':max_original_price'] = number_format($maxOriginalPrice, 2, '.', '');
     }
 
     if ($stockStatus === 'in_stock') {
@@ -511,8 +404,6 @@ try {
             OR CAST(pv.stock_quantity AS CHAR) LIKE :q_stock_quantity
             OR CAST(pv.reserved_quantity AS CHAR) LIKE :q_reserved_quantity
             OR CAST(pv.low_stock_limit AS CHAR) LIKE :q_low_stock_limit
-            OR CAST(pv.is_available AS CHAR) LIKE :q_is_available
-            OR p.status LIKE :q_product_status
             OR DATE_FORMAT(pv.created_at, '%Y-%m-%d %H:%i:%s') LIKE :q_created_at
             OR DATE_FORMAT(pv.updated_at, '%Y-%m-%d %H:%i:%s') LIKE :q_updated_at
         )";
@@ -541,51 +432,30 @@ try {
         $params[':q_stock_quantity'] = $searchValue;
         $params[':q_reserved_quantity'] = $searchValue;
         $params[':q_low_stock_limit'] = $searchValue;
-        $params[':q_is_available'] = $searchValue;
-        $params[':q_product_status'] = $searchValue;
         $params[':q_created_at'] = $searchValue;
         $params[':q_updated_at'] = $searchValue;
     }
 
-    if ($imageStatus !== '') {
-        $where[] = "
-            EXISTS (
-                SELECT 1
-                FROM product_variant_images pvi_filter
-                WHERE pvi_filter.variant_id = pv.id
-                AND pvi_filter.status = :image_status
-            )
-        ";
-
-        $params[':image_status'] = $imageStatus;
-    }
-
-    $whereSql = !empty($where)
-        ? ' WHERE ' . implode(' AND ', $where)
-        : '';
+    $whereSql = ' WHERE ' . implode(' AND ', $where);
 
     $countSql = "
         SELECT COUNT(*)
         FROM product_variants pv
-        INNER JOIN products p
-            ON p.id = pv.product_id
-        INNER JOIN categories c
-            ON c.id = p.category_id
-        LEFT JOIN sizes s
-            ON s.id = pv.size_id
-        LEFT JOIN colors co
-            ON co.id = pv.color_id
+        INNER JOIN products p ON p.id = pv.product_id
+        INNER JOIN categories c ON c.id = p.category_id
+        LEFT JOIN sizes s ON s.id = pv.size_id
+        LEFT JOIN colors co ON co.id = pv.color_id
         $whereSql
     ";
 
     $countStmt = $pdo->prepare($countSql);
 
     foreach ($params as $key => $value) {
-        if (is_int($value)) {
-            $countStmt->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $countStmt->bindValue($key, $value, PDO::PARAM_STR);
-        }
+        $countStmt->bindValue(
+            $key,
+            $value,
+            is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+        );
     }
 
     $countStmt->execute();
@@ -621,7 +491,6 @@ try {
             pv.is_available,
             pv.created_at,
             pv.updated_at,
-
             p.category_id,
             p.name AS product_name,
             p.slug AS product_slug,
@@ -632,61 +501,43 @@ try {
             p.status AS product_status,
             p.created_at AS product_created_at,
             p.updated_at AS product_updated_at,
-
             c.name AS category_name,
             c.slug AS category_slug,
             c.description AS category_description,
             c.image AS category_image,
             c.sort_order AS category_sort_order,
             c.status AS category_status,
-
             s.name AS size_name,
             s.sort_order AS size_sort_order,
             s.status AS size_status,
-
             co.name AS color_name,
             co.hex_code AS color_hex_code,
             co.status AS color_status
-
         FROM product_variants pv
-
-        INNER JOIN products p
-            ON p.id = pv.product_id
-
-        INNER JOIN categories c
-            ON c.id = p.category_id
-
-        LEFT JOIN sizes s
-            ON s.id = pv.size_id
-
-        LEFT JOIN colors co
-            ON co.id = pv.color_id
-
+        INNER JOIN products p ON p.id = pv.product_id
+        INNER JOIN categories c ON c.id = p.category_id
+        LEFT JOIN sizes s ON s.id = pv.size_id
+        LEFT JOIN colors co ON co.id = pv.color_id
         $whereSql
-
         ORDER BY $sortColumn $sortOrder, pv.id DESC
-
-        LIMIT :limit
-        OFFSET :offset
+        LIMIT :limit OFFSET :offset
     ";
 
     $stmt = $pdo->prepare($sql);
 
     foreach ($params as $key => $value) {
-        if (is_int($value)) {
-            $stmt->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $stmt->bindValue($key, $value, PDO::PARAM_STR);
-        }
+        $stmt->bindValue(
+            $key,
+            $value,
+            is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+        );
     }
 
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-
     $stmt->execute();
 
     $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     $formattedVariants = [];
 
     if (!empty($variants)) {
@@ -701,36 +552,25 @@ try {
             $placeholders[] = ':variant_image_id_' . $index;
         }
 
-        $imageWhere = [
-            'pvi.variant_id IN (' . implode(',', $placeholders) . ')'
-        ];
-
-        if ($accountType === 'user') {
-            $imageWhere[] = "pvi.status = 'active'";
-        }
-
-        if ($imageStatus !== '') {
-            $imageWhere[] = 'pvi.status = :requested_image_status';
-        }
-
         $imageSql = "
             SELECT
-                pvi.id,
-                pvi.variant_id,
-                pvi.image,
-                pvi.alt_text,
-                pvi.is_primary,
-                pvi.sort_order,
-                pvi.status,
-                pvi.created_at,
-                pvi.updated_at
-            FROM product_variant_images pvi
-            WHERE " . implode(' AND ', $imageWhere) . "
+                id,
+                variant_id,
+                image,
+                alt_text,
+                is_primary,
+                sort_order,
+                status,
+                created_at,
+                updated_at
+            FROM product_variant_images
+            WHERE variant_id IN (" . implode(',', $placeholders) . ")
+            AND status = 'active'
             ORDER BY
-                pvi.variant_id ASC,
-                pvi.is_primary DESC,
-                pvi.sort_order ASC,
-                pvi.id ASC
+                variant_id ASC,
+                is_primary DESC,
+                sort_order ASC,
+                id ASC
         ";
 
         $imageStmt = $pdo->prepare($imageSql);
@@ -743,18 +583,9 @@ try {
             );
         }
 
-        if ($imageStatus !== '') {
-            $imageStmt->bindValue(
-                ':requested_image_status',
-                $imageStatus,
-                PDO::PARAM_STR
-            );
-        }
-
         $imageStmt->execute();
 
         $allImages = $imageStmt->fetchAll(PDO::FETCH_ASSOC);
-
         $imagesByVariant = [];
 
         foreach ($allImages as $image) {
@@ -778,7 +609,7 @@ try {
         }
 
         foreach ($variants as $variant) {
-            $currentVariantId = (int)$variant['id'];
+            $variantIdValue = (int)$variant['id'];
 
             $availableStock =
                 (int)$variant['stock_quantity'] -
@@ -796,9 +627,7 @@ try {
                 $calculatedStockStatus = 'in_stock';
             }
 
-            $variantImages =
-                $imagesByVariant[$currentVariantId] ?? [];
-
+            $variantImages = $imagesByVariant[$variantIdValue] ?? [];
             $primaryImage = null;
 
             foreach ($variantImages as $image) {
@@ -813,10 +642,9 @@ try {
             }
 
             $formattedVariants[] = [
-                'id' => $currentVariantId,
+                'id' => $variantIdValue,
                 'sku' => $variant['sku'],
                 'variant_name' => $variant['variant_name'],
-
                 'product' => [
                     'id' => (int)$variant['product_id'],
                     'category_id' => (int)$variant['category_id'],
@@ -830,7 +658,6 @@ try {
                     'created_at' => $variant['product_created_at'],
                     'updated_at' => $variant['product_updated_at']
                 ],
-
                 'category' => [
                     'id' => (int)$variant['category_id'],
                     'name' => $variant['category_name'],
@@ -840,7 +667,6 @@ try {
                     'sort_order' => (int)$variant['category_sort_order'],
                     'status' => $variant['category_status']
                 ],
-
                 'size' => $variant['size_id'] !== null
                     ? [
                         'id' => (int)$variant['size_id'],
@@ -849,7 +675,6 @@ try {
                         'status' => $variant['size_status']
                     ]
                     : null,
-
                 'color' => $variant['color_id'] !== null
                     ? [
                         'id' => (int)$variant['color_id'],
@@ -858,14 +683,12 @@ try {
                         'status' => $variant['color_status']
                     ]
                     : null,
-
                 'pricing' => [
                     'original_price' => $variant['original_price'],
                     'discount_type' => $variant['discount_type'],
                     'discount_value' => $variant['discount_value'],
                     'selling_price' => $variant['selling_price']
                 ],
-
                 'stock' => [
                     'stock_quantity' => (int)$variant['stock_quantity'],
                     'reserved_quantity' => (int)$variant['reserved_quantity'],
@@ -873,13 +696,10 @@ try {
                     'low_stock_limit' => (int)$variant['low_stock_limit'],
                     'stock_status' => $calculatedStockStatus
                 ],
-
                 'is_available' => (int)$variant['is_available'],
-
                 'primary_image' => $primaryImage,
                 'images' => $variantImages,
                 'image_count' => count($variantImages),
-
                 'created_at' => $variant['created_at'],
                 'updated_at' => $variant['updated_at']
             ];
@@ -887,10 +707,7 @@ try {
     }
 
     sendResponse(true, 'Product variants retrieved successfully.', [
-        'viewer_type' => $accountType,
-
         'variants' => $formattedVariants,
-
         'pagination' => [
             'page' => $page,
             'limit' => $limit,
@@ -899,7 +716,6 @@ try {
             'has_previous' => $page > 1,
             'has_next' => $page < $totalPages
         ],
-
         'filters' => [
             'q' => $q !== '' ? $q : null,
             'variant_id' => $variantId,
@@ -907,16 +723,7 @@ try {
             'category_id' => $categoryId,
             'size_id' => $sizeId,
             'color_id' => $colorId,
-            'product_status' => $productStatus !== ''
-                ? $productStatus
-                : null,
-            'image_status' => $imageStatus !== ''
-                ? $imageStatus
-                : null,
-            'discount_type' => $discountType !== ''
-                ? $discountType
-                : null,
-            'is_available' => $isAvailable,
+            'discount_type' => $discountType !== '' ? $discountType : null,
             'is_new_arrival' => $isNewArrival,
             'is_featured' => $isFeatured,
             'is_best_seller' => $isBestSeller,
@@ -924,17 +731,10 @@ try {
             'max_price' => $maxPrice,
             'min_original_price' => $minOriginalPrice,
             'max_original_price' => $maxOriginalPrice,
-            'stock_status' => $stockStatus !== ''
-                ? $stockStatus
-                : null,
-            'created_from' => $createdFrom !== ''
-                ? $createdFrom
-                : null,
-            'created_to' => $createdTo !== ''
-                ? $createdTo
-                : null
+            'stock_status' => $stockStatus !== '' ? $stockStatus : null,
+            'created_from' => $createdFrom !== '' ? $createdFrom : null,
+            'created_to' => $createdTo !== '' ? $createdTo : null
         ],
-
         'sorting' => [
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder
@@ -945,17 +745,16 @@ try {
     sendResponse(
         false,
         'Unable to retrieve product variants.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500
     );
-
 } catch (Throwable $e) {
     sendResponse(
         false,
         'An unexpected error occurred.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500

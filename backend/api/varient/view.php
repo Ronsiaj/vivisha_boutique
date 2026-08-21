@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../config/jwt.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('X-Content-Type-Options: nosniff');
@@ -12,7 +11,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -21,32 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendResponse(false, 'Only GET method is allowed.', null, 405);
-}
-
-$decoded = authenticate();
-validateJWTData($decoded);
-
-$accountType = getAuthenticatedType($decoded);
-$authenticatedId = getAuthenticatedId($decoded);
-
-if ($authenticatedId <= 0) {
-    sendResponse(false, 'Invalid authenticated account.', null, 401);
-}
-
-if (!in_array($accountType, ['admin', 'user'], true)) {
-    sendResponse(false, 'Invalid account type.', null, 403);
-}
-
-if ($accountType === 'admin') {
-    $adminAuth = authenticateAdmin();
-    checkAdminRole($adminAuth, ['admin']);
-} else {
-    $userAuth = authenticateUser();
-    $userId = getAuthenticatedId($userAuth);
-
-    if ($userId <= 0) {
-        sendResponse(false, 'Invalid authenticated user.', null, 401);
-    }
 }
 
 $variantIdInput = isset($_GET['id'])
@@ -64,16 +37,6 @@ if (!preg_match('/^[1-9][0-9]*$/', $variantIdInput)) {
 $variantId = (int)$variantIdInput;
 
 try {
-    $where = ['pv.id = :id'];
-
-    if ($accountType === 'user') {
-        $where[] = "p.status = 'active'";
-        $where[] = "c.status = 'active'";
-        $where[] = "pv.is_available = 1";
-    }
-
-    $whereSql = ' WHERE ' . implode(' AND ', $where);
-
     $stmt = $pdo->prepare(
         "SELECT
             pv.id,
@@ -125,23 +88,26 @@ try {
             co.created_at AS color_created_at,
             co.updated_at AS color_updated_at
 
-         FROM product_variants pv
+        FROM product_variants pv
 
-         INNER JOIN products p
+        INNER JOIN products p
             ON p.id = pv.product_id
 
-         INNER JOIN categories c
+        INNER JOIN categories c
             ON c.id = p.category_id
 
-         LEFT JOIN sizes s
+        LEFT JOIN sizes s
             ON s.id = pv.size_id
 
-         LEFT JOIN colors co
+        LEFT JOIN colors co
             ON co.id = pv.color_id
 
-         $whereSql
+        WHERE pv.id = :id
+        AND p.status = 'active'
+        AND c.status = 'active'
+        AND pv.is_available = 1
 
-         LIMIT 1"
+        LIMIT 1"
     );
 
     $stmt->bindValue(':id', $variantId, PDO::PARAM_INT);
@@ -150,32 +116,30 @@ try {
     $variant = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$variant) {
-        if ($accountType === 'user') {
-            $existsStmt = $pdo->prepare(
-                "SELECT id
-                 FROM product_variants
-                 WHERE id = :id
-                 LIMIT 1"
+        $existsStmt = $pdo->prepare(
+            "SELECT id
+             FROM product_variants
+             WHERE id = :id
+             LIMIT 1"
+        );
+
+        $existsStmt->bindValue(':id', $variantId, PDO::PARAM_INT);
+        $existsStmt->execute();
+
+        if ($existsStmt->fetch()) {
+            sendResponse(
+                false,
+                'This product variant is not available.',
+                null,
+                404
             );
-
-            $existsStmt->bindValue(':id', $variantId, PDO::PARAM_INT);
-            $existsStmt->execute();
-
-            if ($existsStmt->fetch()) {
-                sendResponse(
-                    false,
-                    'This product variant is not available.',
-                    null,
-                    404
-                );
-            }
         }
 
         sendResponse(false, 'Product variant not found.', null, 404);
     }
 
-    $imageSql = "
-        SELECT
+    $imageStmt = $pdo->prepare(
+        "SELECT
             id,
             variant_id,
             image,
@@ -187,20 +151,12 @@ try {
             updated_at
         FROM product_variant_images
         WHERE variant_id = :variant_id
-    ";
-
-    if ($accountType === 'user') {
-        $imageSql .= " AND status = 'active'";
-    }
-
-    $imageSql .= "
+        AND status = 'active'
         ORDER BY
             is_primary DESC,
             sort_order ASC,
-            id ASC
-    ";
-
-    $imageStmt = $pdo->prepare($imageSql);
+            id ASC"
+    );
 
     $imageStmt->bindValue(
         ':variant_id',
@@ -311,7 +267,6 @@ try {
     }
 
     sendResponse(true, 'Product variant retrieved successfully.', [
-        'viewer_type' => $accountType,
         'variant' => [
             'id' => (int)$variant['id'],
             'product_id' => (int)$variant['product_id'],
@@ -366,17 +321,16 @@ try {
     sendResponse(
         false,
         'Unable to retrieve product variant.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500
     );
-
 } catch (Throwable $e) {
     sendResponse(
         false,
         'An unexpected error occurred.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500

@@ -47,30 +47,71 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
+
+    // Name Validation
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
       setError('Please enter your full name.');
       return;
     }
-    if (!formData.mobile.trim() || !/^[6-9]\d{9}$/.test(formData.mobile)) {
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      setError('Name must be between 2 and 100 characters.');
+      return;
+    }
+    if (!/^[\p{L}][\p{L}\s.'-]*$/u.test(trimmedName)) {
+      setError('Name contains invalid characters.');
+      return;
+    }
+
+    // Mobile Number Validation
+    const trimmedMobile = formData.mobile.trim();
+    if (!trimmedMobile || !/^[6-9]\d{9}$/.test(trimmedMobile)) {
       setError('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
-    if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+    if (/^(\d)\1{9}$/.test(trimmedMobile)) {
+      setError('Invalid mobile number.');
+      return;
+    }
+
+    // Email Validation (Mandatory)
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
+    if (trimmedEmail.length > 150) {
+      setError('Email must not exceed 150 characters.');
+      return;
+    }
+
+    // Password Validation
     if (!formData.password) {
       setError('Please enter a password.');
       return;
     }
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+      setError('Password must contain at least 8 characters.');
+      return;
+    }
+    if (formData.password.length > 72) {
+      setError('Password must not exceed 72 characters.');
+      return;
+    }
+    if (/\s/.test(formData.password)) {
+      setError('Password must not contain spaces.');
       return;
     }
     if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(formData.password)) {
       setError('Password must contain upper, lower, number, and special character.');
       return;
     }
+
+    // Confirm Password & Terms Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -85,9 +126,9 @@ const Register = () => {
 
     try {
       const result = await register({
-        name: formData.name,
-        mobile: formData.mobile,
-        email: formData.email,
+        name: trimmedName,
+        mobile: trimmedMobile,
+        email: trimmedEmail,
         date_of_birth: formData.date_of_birth,
         password: formData.password
       });
@@ -98,11 +139,11 @@ const Register = () => {
         // Customer registration redirects to target destination (e.g. /checkout)
         navigate(redirectTarget);
       } else {
-        setError('Registration failed. Please try again.');
+        setError(result.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
       setIsLoading(false);
-      setError('An error occurred during registration. Please try again.');
+      setError(err.message || 'An error occurred during registration. Please try again.');
     }
   };
 
@@ -181,7 +222,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email Address (Optional)</label>
+            <label htmlFor="email">Email Address</label>
             <div className="input-with-icon">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -196,6 +237,7 @@ const Register = () => {
                 placeholder="Enter email address"
                 value={formData.email}
                 onChange={handleChange}
+                required
               />
             </div>
           </div>

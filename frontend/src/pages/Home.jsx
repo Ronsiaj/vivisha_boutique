@@ -3,10 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 
-// Import banner images
+// Import banner & fallback images
 import banner1 from '../../assets/images/banner1.png';
 import banner2 from '../../assets/images/banner2.png';
 import banner3 from '../../assets/images/banner3.png';
+
+const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
+const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
 
 const bannerImages = [
   { id: 1, src: banner1, title: 'Slub Silk Collection' },
@@ -14,40 +17,7 @@ const bannerImages = [
   { id: 3, src: banner3, title: 'Designer Ethnic Wear' }
 ];
 
-const newArrivalProducts = [
-  {
-    id: 1,
-    name: 'Peacock Blue Salwar Set (3 Piece Suit) - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner1
-  },
-  {
-    id: 2,
-    name: 'Avocado Green Salwar Suit - Slub Silk',
-    category: 'Salwar Sets',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner2
-  },
-  {
-    id: 3,
-    name: 'Mustard 3 Piece Set - Slub Silk Cotton',
-    category: '3 Piece Suit',
-    price: 1799,
-    originalPrice: 2299,
-    image: banner3
-  },
-  {
-    id: 4,
-    name: 'Royal Magenta Anarkali Suit Set',
-    category: 'Anarkali Suits',
-    price: 2499,
-    originalPrice: 3199,
-    image: banner1
-  }
-];
+const fallbackImages = [banner1, banner2, banner3];
 
 const Home = () => {
   const navigate = useNavigate();
@@ -55,6 +25,52 @@ const Home = () => {
   const { isAuthenticated } = useAuth();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Dynamic Backend Categories State
+  const [categories, setCategories] = useState([]);
+  const [isCategoryLoading, setIsCategoryLoading] = useState(true);
+
+  // Dynamic Backend New Arrivals State
+  const [newArrivalVariants, setNewArrivalVariants] = useState([]);
+  const [isNewArrivalsLoading, setIsNewArrivalsLoading] = useState(true);
+
+  // Fetch Categories from Backend API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/category/list.php?limit=100`);
+        const data = await response.json();
+        if (data.status && data.data && data.data.categories) {
+          const activeCategories = data.data.categories.filter(c => c.status === 'active');
+          setCategories(activeCategories.length > 0 ? activeCategories : data.data.categories);
+        }
+      } catch (err) {
+        console.error('Error loading backend categories:', err);
+      } finally {
+        setIsCategoryLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Fetch New Arrivals from Backend API (is_new_arrival = 1)
+  useEffect(() => {
+    const fetchNewArrivals = async () => {
+      setIsNewArrivalsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/varient/list.php?is_new_arrival=1&limit=12`);
+        const data = await response.json();
+        if (data.status && data.data && data.data.variants) {
+          setNewArrivalVariants(data.data.variants);
+        }
+      } catch (err) {
+        console.error('Error loading new arrival products:', err);
+      } finally {
+        setIsNewArrivalsLoading(false);
+      }
+    };
+    fetchNewArrivals();
+  }, []);
 
   // Auto slide on mobile view
   useEffect(() => {
@@ -66,6 +82,23 @@ const Home = () => {
 
   const handleShopNowClick = () => {
     navigate('/collections');
+  };
+
+  const getCategoryImageUrl = (cat, index) => {
+    if (cat.image && cat.image.trim() !== '') {
+      if (cat.image.startsWith('http')) return cat.image;
+      return `${ASSET_BASE_URL}${cat.image}`;
+    }
+    return fallbackImages[index % fallbackImages.length];
+  };
+
+  const getProductImageUrl = (variant, index) => {
+    if (variant.primary_image && variant.primary_image.image) {
+      const imgPath = variant.primary_image.image;
+      if (imgPath.startsWith('http')) return imgPath;
+      return `${ASSET_BASE_URL}${imgPath}`;
+    }
+    return fallbackImages[index % fallbackImages.length];
   };
 
   return (
@@ -123,7 +156,7 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Premium Floating Trust Card ON the Banner (Matching Reference Image) */}
+        {/* Premium Floating Trust Card ON the Banner */}
         <div className="banner-trust-floating-card">
           <div className="trust-features-grid">
             <div className="trust-feature-card">
@@ -183,49 +216,61 @@ const Home = () => {
       </section>
 
       {/* ---------------------------------------------------- */}
-      {/* Product Categories Quick Link Bar */}
+      {/* Dynamic Backend Product Categories Section           */}
       {/* ---------------------------------------------------- */}
       <section className="home-categories-section">
         <div className="container">
-          <div className="section-title-wrapper">
-            <h2 className="section-heading">Product Categories</h2>
-            <p className="section-subheading">Explore our exclusive handcrafted boutique collections</p>
-          </div>
-
-          <div className="category-cards-grid">
-            <Link to="/collections?cat=3-piece-suit" className="category-card">
-              <div className="cat-img-box">
-                <img src={banner1} alt="3 Piece Suit Sets" />
-              </div>
-              <h3 className="cat-name">3 Piece Suit Sets</h3>
-            </Link>
-
-            <Link to="/collections?cat=salwar-sets" className="category-card">
-              <div className="cat-img-box">
-                <img src={banner2} alt="Salwar Suit Sets" />
-              </div>
-              <h3 className="cat-name">Salwar Suit Sets</h3>
-            </Link>
-
-            <Link to="/collections?cat=slub-silk" className="category-card">
-              <div className="cat-img-box">
-                <img src={banner3} alt="Slub Silk Cotton" />
-              </div>
-              <h3 className="cat-name">Slub Silk Cotton</h3>
-            </Link>
-
-            <Link to="/collections?cat=anarkali" className="category-card">
-              <div className="cat-img-box">
-                <img src={banner1} alt="Anarkali Suits" />
-              </div>
-              <h3 className="cat-name">Anarkali Suits</h3>
+          <div className="home-categories-header">
+            <div>
+              <h2 className="section-heading">Product Categories</h2>
+              <p className="section-subheading">Explore our exclusive handcrafted boutique collections</p>
+            </div>
+            <Link to="/collections" className="view-more-categories-btn">
+              <span>View More Categories</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
             </Link>
           </div>
+
+          {isCategoryLoading ? (
+            <div className="category-loading-skeleton">
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+            </div>
+          ) : categories.length === 0 ? (
+            <p className="no-categories-text">No categories found.</p>
+          ) : (
+            <div className="category-cards-grid">
+              {categories.map((cat, index) => (
+                <Link
+                  key={cat.id}
+                  to={`/collections?category_id=${cat.id}`}
+                  className="category-card"
+                >
+                  <div className="cat-img-box">
+                    <img
+                      src={getCategoryImageUrl(cat, index)}
+                      alt={cat.name}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = fallbackImages[index % fallbackImages.length];
+                      }}
+                    />
+                  </div>
+                  <h3 className="cat-name">{cat.name}</h3>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       {/* ---------------------------------------------------- */}
-      {/* New Arrivals Section (Without Offer Labels)           */}
+      {/* Dynamic Backend New Arrivals Section                  */}
       {/* ---------------------------------------------------- */}
       <section className="home-products-section">
         <div className="container">
@@ -237,70 +282,92 @@ const Home = () => {
             <Link to="/collections" className="view-all-link">View All Products &rarr;</Link>
           </div>
 
-          <div className="products-grid">
-            {newArrivalProducts.map((product) => {
-              const isWishlisted = isInWishlist(product.id);
-              return (
-                <div
-                  key={product.id}
-                  className="product-card"
-                  onClick={() => navigate(`/product/${product.id}`)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="product-image-wrapper">
-                    <img src={product.image} alt={product.name} className="product-img" />
-                    <button
-                      className={`wishlist-heart-btn ${isWishlisted ? 'active' : ''}`}
-                      aria-label="Add to Wishlist"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isAuthenticated) {
-                          navigate('/login', { state: { from: location.pathname } });
-                          return;
-                        }
-                        toggleWishlist(product);
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? '#A049A3' : 'none'} stroke={isWishlisted ? '#A049A3' : '#333333'} strokeWidth="2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                      </svg>
-                    </button>
-                    <div className="product-image-arrow-overlay">
-                      <span>View Details</span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="product-info">
-                    <h4 className="product-title">{product.name}</h4>
-                    <div className="product-info-row">
-                      <div className="product-pricing">
-                        <span className="price">Rs. {product.price.toLocaleString('en-IN')}.00</span>
-                        {product.originalPrice > product.price && (
-                          <span className="original-price">Rs. {product.originalPrice.toLocaleString('en-IN')}.00</span>
-                        )}
-                      </div>
+          {isNewArrivalsLoading ? (
+            <div className="category-loading-skeleton">
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+              <div className="skeleton-card"></div>
+            </div>
+          ) : newArrivalVariants.length === 0 ? (
+            <p className="no-categories-text">No new arrivals available right now.</p>
+          ) : (
+            <div className="products-grid">
+              {newArrivalVariants.map((variant, index) => {
+                const isWishlisted = isInWishlist(variant.id);
+                const sellPrice = parseFloat(variant.pricing?.selling_price || 0);
+                const origPrice = parseFloat(variant.pricing?.original_price || 0);
+
+                return (
+                  <div
+                    key={variant.id}
+                    className="product-card"
+                    onClick={() => navigate(`/product/${variant.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="product-image-wrapper">
+                      <img
+                        src={getProductImageUrl(variant, index)}
+                        alt={variant.product.name}
+                        className="product-img"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = fallbackImages[index % fallbackImages.length];
+                        }}
+                      />
                       <button
-                        className="product-detail-arrow-btn"
-                        aria-label="View Product Details"
+                        className={`wishlist-heart-btn ${isWishlisted ? 'active' : ''}`}
+                        aria-label="Add to Wishlist"
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/product/${product.id}`);
+                          if (!isAuthenticated) {
+                            navigate('/login', { state: { from: location.pathname } });
+                            return;
+                          }
+                          toggleWishlist(variant);
                         }}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? '#A049A3' : 'none'} stroke={isWishlisted ? '#A049A3' : '#333333'} strokeWidth="2">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                      </button>
+                      <div className="product-image-arrow-overlay">
+                        <span>View Details</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <line x1="5" y1="12" x2="19" y2="12"></line>
                           <polyline points="12 5 19 12 12 19"></polyline>
                         </svg>
-                      </button>
+                      </div>
+                    </div>
+                    <div className="product-info">
+                      <h4 className="product-title">{variant.product.name}</h4>
+                      <div className="product-info-row">
+                        <div className="product-pricing">
+                          <span className="price">Rs. {sellPrice.toLocaleString('en-IN')}.00</span>
+                          {origPrice > sellPrice && (
+                            <span className="original-price">Rs. {origPrice.toLocaleString('en-IN')}.00</span>
+                          )}
+                        </div>
+                        <button
+                          className="product-detail-arrow-btn"
+                          aria-label="View Product Details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/product/${variant.id}`);
+                          }}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
     </div>

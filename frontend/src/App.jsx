@@ -82,6 +82,7 @@ function App() {
                   <Route path="/dashboard" element={<CustomerProfile defaultTab="profile" />} />
                   <Route path="/profile" element={<CustomerProfile defaultTab="profile" />} />
                   <Route path="/orders" element={<CustomerProfile defaultTab="orders" />} />
+                  <Route path="/addresses" element={<CustomerProfile defaultTab="addresses" />} />
                   <Route path="/track-order" element={<CustomerProfile defaultTab="track" />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route path="/cart" element={<Cart />} />

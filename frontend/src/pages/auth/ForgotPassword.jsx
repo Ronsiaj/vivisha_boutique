@@ -30,6 +30,21 @@ const ForgotPassword = () => {
 
   const handleRequestOtp = async (e) => {
     e.preventDefault();
+
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      setError('Email is required.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (trimmedEmail.length > 150) {
+      setError('Email must not exceed 150 characters.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
@@ -37,7 +52,7 @@ const ForgotPassword = () => {
       const response = await fetch('http://localhost/vivisha_boutique/backend/api/forget_password/forget.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email })
+        body: JSON.stringify({ email: trimmedEmail })
       });
       const result = await response.json();
       
@@ -56,6 +71,19 @@ const ForgotPassword = () => {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
+
+    const trimmedEmail = formData.email.trim();
+    const trimmedOtp = formData.otp.trim();
+
+    if (!trimmedOtp) {
+      setError('OTP is required.');
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(trimmedOtp)) {
+      setError('OTP must be exactly 6 digits.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
@@ -65,8 +93,8 @@ const ForgotPassword = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           otp_request_id: otpRequestId,
-          email: formData.email,
-          otp: formData.otp
+          email: trimmedEmail,
+          otp: trimmedOtp
         })
       });
       const result = await response.json();
@@ -85,6 +113,52 @@ const ForgotPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+
+    const trimmedEmail = formData.email.trim();
+    const newPassword = formData.new_password;
+    const confirmPassword = formData.confirm_password;
+
+    if (!newPassword) {
+      setError('New password is required.');
+      return;
+    }
+    if (!confirmPassword) {
+      setError('Confirm password is required.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Password must contain at least 8 characters.');
+      return;
+    }
+    if (newPassword.length > 72) {
+      setError('Password must not exceed 72 characters.');
+      return;
+    }
+    if (/\s/.test(newPassword)) {
+      setError('Password must not contain spaces.');
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      setError('Password must contain at least one uppercase letter.');
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      setError('Password must contain at least one lowercase letter.');
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError('Password must contain at least one number.');
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      setError('Password must contain at least one special character.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirm password do not match.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     
@@ -94,9 +168,9 @@ const ForgotPassword = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           otp_request_id: otpRequestId,
-          email: formData.email,
-          new_password: formData.new_password,
-          confirm_password: formData.confirm_password
+          email: trimmedEmail,
+          new_password: newPassword,
+          confirm_password: confirmPassword
         })
       });
       const result = await response.json();

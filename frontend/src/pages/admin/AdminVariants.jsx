@@ -107,17 +107,17 @@ const AdminVariants = () => {
     if ((mode === 'edit' || mode === 'view') && variant) {
       setFormData({
         id: variant.id,
-        product_id: variant.product_id || '',
-        size_id: variant.size?.id || '',
-        color_id: variant.color?.id || '',
+        product_id: variant.product?.id || variant.product_id || '',
+        size_id: variant.size?.id || variant.size_id || '',
+        color_id: variant.color?.id || variant.color_id || '',
         sku: variant.sku || '',
         variant_name: variant.variant_name || '',
-        original_price: variant.original_price || '0.00',
-        discount_type: variant.discount_type || 'none',
-        discount_value: variant.discount_value || '0',
-        stock_quantity: variant.stock_quantity || '0',
-        reserved_quantity: variant.reserved_quantity || '0',
-        low_stock_limit: variant.low_stock_limit || '5',
+        original_price: variant.pricing?.original_price ?? variant.original_price ?? '0.00',
+        discount_type: variant.pricing?.discount_type ?? variant.discount_type ?? 'none',
+        discount_value: variant.pricing?.discount_value ?? variant.discount_value ?? '0',
+        stock_quantity: variant.stock?.stock_quantity ?? variant.stock_quantity ?? '0',
+        reserved_quantity: variant.stock?.reserved_quantity ?? variant.reserved_quantity ?? '0',
+        low_stock_limit: variant.stock?.low_stock_limit ?? variant.low_stock_limit ?? '5',
         is_available: !!variant.is_available,
         images: [] 
       });
@@ -266,28 +266,41 @@ const AdminVariants = () => {
                     </td>
                   </tr>
                 ) : (
-                  variants.map(vari => (
-                    <tr key={vari.id}>
-                      <td style={{ fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{vari.sku}</td>
-                      <td>{vari.product_name || '-'}</td>
-                      <td>
-                        {vari.size?.name ? <span style={{ marginRight: '8px', padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontWeight: '500' }}>{vari.size.name}</span> : null}
-                        {vari.color?.name ? (
-                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                             <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: vari.color.hex_code, border: '1px solid #e5e7eb' }}></span>
-                             {vari.color.name}
-                           </span>
-                        ) : null}
-                      </td>
-                      <td style={{ fontWeight: '600', color: '#059669' }}>
-                        ₹{vari.selling_price}
-                      </td>
-                      <td>
-                        <span className={`admin-badge ${parseInt(vari.stock_quantity) > parseInt(vari.low_stock_limit) ? 'admin-badge-active' : 'admin-badge-blocked'}`}>
-                          {vari.stock_quantity} in stock
-                        </span>
-                      </td>
-                      <td style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
+                  variants.map(vari => {
+                    const sellingPrice = vari.pricing?.selling_price ?? vari.selling_price ?? vari.pricing?.original_price ?? vari.original_price;
+                    const originalPrice = vari.pricing?.original_price ?? vari.original_price;
+                    const stockQty = vari.stock?.stock_quantity ?? vari.stock_quantity ?? '0';
+                    const lowLimit = vari.stock?.low_stock_limit ?? vari.low_stock_limit ?? '5';
+                    const productName = vari.product?.name || vari.product_name || '-';
+                    const hasDiscount = originalPrice && sellingPrice && parseFloat(originalPrice) > parseFloat(sellingPrice);
+
+                    return (
+                      <tr key={vari.id}>
+                        <td style={{ fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{vari.sku}</td>
+                        <td>{productName}</td>
+                        <td>
+                          {vari.size?.name ? <span style={{ marginRight: '8px', padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontWeight: '500' }}>{vari.size.name}</span> : null}
+                          {vari.color?.name ? (
+                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                               <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: vari.color.hex_code, border: '1px solid #e5e7eb' }}></span>
+                               {vari.color.name}
+                             </span>
+                          ) : null}
+                        </td>
+                        <td style={{ fontWeight: '600', color: '#059669' }}>
+                          ₹{sellingPrice !== undefined && sellingPrice !== null ? parseFloat(sellingPrice).toFixed(2) : '-'}
+                          {hasDiscount && (
+                            <span style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through', fontWeight: '400' }}>
+                              ₹{parseFloat(originalPrice).toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`admin-badge ${parseInt(stockQty) > parseInt(lowLimit) ? 'admin-badge-active' : 'admin-badge-blocked'}`}>
+                            {stockQty} in stock
+                          </span>
+                        </td>
+                        <td style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
                         <button 
                           onClick={() => openModal('view', vari)}
                           className="admin-action-btn admin-action-view"
@@ -310,8 +323,9 @@ const AdminVariants = () => {
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })
+              )}
               </tbody>
             </table>
           </div>

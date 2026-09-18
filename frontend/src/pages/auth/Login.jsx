@@ -33,12 +33,27 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email.trim()) {
+
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
       setError('Please enter your email address.');
       return;
     }
+    if (!/^\S+@\S+\.\S+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (trimmedEmail.length > 150) {
+      setError('Email must not exceed 150 characters.');
+      return;
+    }
+
     if (!formData.password) {
       setError('Please enter your password.');
+      return;
+    }
+    if (formData.password.length > 72) {
+      setError('Password must not exceed 72 characters.');
       return;
     }
 
@@ -48,7 +63,7 @@ const Login = () => {
     try {
       // Call backend API / Auth Context
       const result = await login({
-        email: formData.email,
+        email: trimmedEmail,
         password: formData.password
       });
 
@@ -62,11 +77,11 @@ const Login = () => {
           navigate(redirectTarget);
         }
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError(result.message || 'Invalid credentials. Please try again.');
       }
     } catch (err) {
       setIsLoading(false);
-      setError('Authentication failed. Please check your credentials.');
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     }
   };
 

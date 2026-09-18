@@ -46,6 +46,7 @@ const Collections = () => {
   const [inStockOnly, setInStockOnly] = useState(false);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [sortBy, setSortBy] = useState('newest');
+  const [searchKeyword, setSearchKeyword] = useState('');
   
   // Desktop Accordions Open/Closed State
   const [openAccordions, setOpenAccordions] = useState({
@@ -107,6 +108,27 @@ const Collections = () => {
     fetchCategories();
   }, []);
 
+  // Parse Category & Search Query from URL Query Parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const catId = params.get('category_id') || params.get('cat');
+    if (catId) {
+      const parsedId = parseInt(catId, 10);
+      if (!isNaN(parsedId)) {
+        setSelectedCategory(parsedId);
+      }
+    } else {
+      setSelectedCategory(null);
+    }
+    const q = params.get('q') || params.get('search');
+    if (q) {
+      setSearchKeyword(q.trim());
+    } else {
+      setSearchKeyword('');
+    }
+    setCurrentPage(1);
+  }, [location.search]);
+
   // Fetch Variants
   useEffect(() => {
     const fetchVariants = async () => {
@@ -120,6 +142,7 @@ const Collections = () => {
         if (selectedCategory) query.append('category_id', selectedCategory);
         if (selectedSize) query.append('size_id', selectedSize);
         if (inStockOnly) query.append('stock_status', 'in_stock');
+        if (searchKeyword) query.append('q', searchKeyword);
         
         if (sortBy === 'price-low') {
           query.append('sort_by', 'selling_price');
@@ -148,7 +171,7 @@ const Collections = () => {
       }
     };
     fetchVariants();
-  }, [currentPage, selectedCategory, selectedSize, inStockOnly, maxPrice, sortBy]);
+  }, [currentPage, selectedCategory, selectedSize, inStockOnly, maxPrice, sortBy, searchKeyword]);
 
   const toggleAccordion = (key) => {
     setOpenAccordions(prev => ({
@@ -237,7 +260,9 @@ const Collections = () => {
     setSelectedSize(null);
     setInStockOnly(false);
     setMaxPrice(3000);
+    setSearchKeyword('');
     setCurrentPage(1);
+    navigate('/collections', { replace: true });
   };
 
   const handleSelectSort = (optionId) => {
@@ -259,7 +284,8 @@ const Collections = () => {
     (selectedCategory !== null ? 1 : 0) +
     (selectedSize !== null ? 1 : 0) +
     (inStockOnly ? 1 : 0) +
-    (maxPrice < 3000 ? 1 : 0);
+    (maxPrice < 3000 ? 1 : 0) +
+    (searchKeyword ? 1 : 0);
 
   const handleProductClick = (variantId) => {
     navigate(`/product/${variantId}`);

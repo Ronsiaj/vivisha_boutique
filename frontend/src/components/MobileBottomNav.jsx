@@ -2,11 +2,13 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const MobileBottomNav = () => {
   const location = useLocation();
   const { wishlistCount } = useWishlist();
   const { cartCount } = useCart();
+  const { isAuthenticated } = useAuth();
 
   const navItems = [
     {
@@ -52,7 +54,7 @@ const MobileBottomNav = () => {
       )
     },
     {
-      path: '/login',
+      path: isAuthenticated ? '/profile' : '/login',
       label: 'Account',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

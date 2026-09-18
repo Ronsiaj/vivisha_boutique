@@ -1,21 +1,21 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     onClose();
+    navigate('/');
   };
 
   const menuItems = [
     { path: '/', label: 'Home', hasArrow: false },
     { path: '/collections', label: 'Collections', hasArrow: true },
-    { path: '/orders', label: 'My Orders', hasArrow: true },
-    { path: '/notifications', label: 'Notifications', hasArrow: true },
     { path: '/about', label: 'About Us', hasArrow: false },
     { path: '/contact', label: 'Contact Us', hasArrow: false },
     { path: '/privacy-policy', label: 'Privacy Policy', hasArrow: false },
@@ -49,7 +49,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             <div className="sidebar-user-row">
               <div className="sidebar-user-info-text">
                 <h3 className="user-name">{user?.name || 'User Profile'}</h3>
-                <p className="user-mobile">{user?.mobile || 'Logged In'}</p>
+                <p className="user-mobile">{user?.phone || ''}</p>
               </div>
               <div className="sidebar-user-profile-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           )}
         </div>
 
-        {/* Navigation List matching the reference image layout */}
+        {/* Navigation List — Site navigation only */}
         <div className="sidebar-menu-body">
           <div className="sidebar-nav-list">
             {menuItems.map((item) => {

@@ -122,13 +122,92 @@ const Checkout = () => {
 
   const handleSaveAddressSubmit = async (e) => {
     e.preventDefault();
-    if (!addressForm.door_no || !addressForm.street || !addressForm.area || !addressForm.city || !addressForm.state || !addressForm.pincode) {
-      alert('Please fill in all required address fields.');
+
+    const doorNo = addressForm.door_no ? addressForm.door_no.trim() : '';
+    const street = addressForm.street ? addressForm.street.trim() : '';
+    const area = addressForm.area ? addressForm.area.trim() : '';
+    const city = addressForm.city ? addressForm.city.trim() : '';
+    const district = addressForm.district ? addressForm.district.trim() : '';
+    const state = addressForm.state ? addressForm.state.trim() : '';
+    const pincode = addressForm.pincode ? addressForm.pincode.trim() : '';
+    const landmark = addressForm.landmark ? addressForm.landmark.trim() : '';
+
+    if (!doorNo) {
+      alert('Door number is required.');
+      return;
+    }
+    if (doorNo.length < 1 || doorNo.length > 100) {
+      alert('Door number must be between 1 and 100 characters.');
+      return;
+    }
+
+    if (!street) {
+      alert('Street is required.');
+      return;
+    }
+    if (street.length < 2 || street.length > 150) {
+      alert('Street must be between 2 and 150 characters.');
+      return;
+    }
+
+    if (!area) {
+      alert('Area is required.');
+      return;
+    }
+    if (area.length < 2 || area.length > 150) {
+      alert('Area must be between 2 and 150 characters.');
+      return;
+    }
+
+    if (!city) {
+      alert('City is required.');
+      return;
+    }
+    if (city.length < 2 || city.length > 100) {
+      alert('City must be between 2 and 100 characters.');
+      return;
+    }
+
+    if (district && district.length > 100) {
+      alert('District must not exceed 100 characters.');
+      return;
+    }
+
+    if (!state) {
+      alert('State is required.');
+      return;
+    }
+    if (state.length < 2 || state.length > 100) {
+      alert('State must be between 2 and 100 characters.');
+      return;
+    }
+
+    if (!pincode) {
+      alert('Pincode is required.');
+      return;
+    }
+    if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+      alert('Please enter a valid 6-digit Indian pincode.');
+      return;
+    }
+
+    if (landmark && landmark.length > 150) {
+      alert('Landmark must not exceed 150 characters.');
       return;
     }
 
     const endpoint = editingAddressId ? '/address/update.php' : '/address/create.php';
-    const payload = { ...addressForm };
+    const payload = {
+      ...addressForm,
+      door_no: doorNo,
+      street,
+      area,
+      city,
+      district,
+      state,
+      pincode,
+      landmark
+    };
     if (editingAddressId) {
       payload.address_id = editingAddressId;
     }

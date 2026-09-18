@@ -121,11 +121,22 @@ const ProductDetails = () => {
     }
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    if (!variant || !variant.id) {
+      alert('Please select a valid product variant.');
+      return;
+    }
+
+    if ((variant.stock?.available_quantity ?? 0) <= 0 || variant.stock?.stock_status === 'out_of_stock') {
+      alert('This item is currently out of stock.');
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
+
     const cartItem = {
       id: variant.product.id,
       name: variant.product.name,
@@ -133,16 +144,50 @@ const ProductDetails = () => {
       image: variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '',
       variantId: variant.id
     };
-    addToCart(cartItem, quantity);
+    await addToCart(cartItem, quantity);
   };
 
-  const handleBuyNow = () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: location.pathname } });
+  const handleBuyNow = async () => {
+    if (!variant || !variant.id) {
+      alert('Please select a valid product variant.');
       return;
     }
-    handleAddToCart();
-    navigate('/cart');
+
+    if ((variant.stock?.available_quantity ?? 0) <= 0 || variant.stock?.stock_status === 'out_of_stock') {
+      alert('This item is currently out of stock.');
+      return;
+    }
+
+    const cartItem = {
+      id: variant.product.id,
+      name: variant.product.name,
+      price: sellPrice,
+      image: variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '',
+      variantId: variant.id
+    };
+
+    if (!isAuthenticated) {
+      const buyNowData = {
+        buyNow: true,
+        variantId: variant.id,
+        quantity: quantity,
+        product: cartItem
+      };
+      sessionStorage.setItem('vivisha_buynow_pending', JSON.stringify(buyNowData));
+      navigate('/login', {
+        state: {
+          from: location.pathname,
+          buyNow: true,
+          buyNowItem: buyNowData
+        }
+      });
+      return;
+    }
+
+    const success = await addToCart(cartItem, quantity);
+    if (success) {
+      navigate('/cart');
+    }
   };
 
   const handleToggleWishlist = () => {

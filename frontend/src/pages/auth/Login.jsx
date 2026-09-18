@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import logo from '../../../assets/images/boutique_logo.png';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { addToCart } = useCart();
 
   const redirectTarget = location.state?.from || '/';
   const isFromCheckout = location.state?.from === '/checkout';
@@ -72,7 +74,34 @@ const Login = () => {
       if (result.success && result.user) {
         // Dynamic Role-Based Redirection:
         if (result.user.role === 'admin') {
+          sessionStorage.removeItem('vivisha_buynow_pending');
           navigate('/admin/dashboard');
+          return;
+        }
+
+        // Check for Buy Now intent from location state or sessionStorage
+        const pendingBuyNowStr = sessionStorage.getItem('vivisha_buynow_pending');
+        let pendingBuyNow = null;
+        if (location.state?.buyNow && location.state?.buyNowItem) {
+          pendingBuyNow = location.state.buyNowItem;
+        } else if (pendingBuyNowStr) {
+          try {
+            pendingBuyNow = JSON.parse(pendingBuyNowStr);
+          } catch (err) {
+            pendingBuyNow = null;
+          }
+        }
+
+        if (pendingBuyNow && pendingBuyNow.variantId) {
+          // Clear the pending intent so it executes only once
+          sessionStorage.removeItem('vivisha_buynow_pending');
+          
+          await addToCart(
+            pendingBuyNow.product || { variantId: pendingBuyNow.variantId },
+            pendingBuyNow.quantity || 1,
+            result.token
+          );
+          navigate('/cart');
         } else {
           navigate(redirectTarget);
         }

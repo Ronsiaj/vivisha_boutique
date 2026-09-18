@@ -32,13 +32,20 @@ export const CartProvider = ({ children }) => {
     }
   }, [isAuthenticated, token]);
 
-  const fetchCart = async () => {
+  const fetchCart = async (customToken = null) => {
+    const activeToken = customToken || token || localStorage.getItem('vivisha_auth_token');
+    if (!activeToken) {
+      setCartItems([]);
+      setCartSummary({ total_items: 0, total_quantity: 0, subtotal: 0 });
+      setCartId(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/cart/list.php`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         }
       });
       const data = await response.json();
@@ -67,15 +74,16 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const addToCart = async (cartItem, quantity = 1) => {
-    if (!isAuthenticated || !token) return false;
+  const addToCart = async (cartItem, quantity = 1, customToken = null) => {
+    const activeToken = customToken || token || localStorage.getItem('vivisha_auth_token');
+    if (!activeToken) return false;
     
     try {
       const response = await fetch(`${API_BASE_URL}/cart/add.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({
           variant_id: cartItem.variantId,
@@ -84,7 +92,7 @@ export const CartProvider = ({ children }) => {
       });
       const data = await response.json();
       if (data.status) {
-        fetchCart();
+        await fetchCart(activeToken);
         return true;
       } else {
         console.error(data.message);

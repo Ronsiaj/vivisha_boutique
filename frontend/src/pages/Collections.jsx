@@ -14,25 +14,71 @@ const sortOptions = [
   { id: 'price-high', label: 'Price: High to Low' }
 ];
 
-const availableSizesList = [
-  { id: 1, name: 'S' },
-  { id: 2, name: 'M' },
-  { id: 3, name: 'L' },
-  { id: 4, name: 'XL' },
-  { id: 5, name: 'XXL' },
-  { id: 10, name: 'Free Size' }
+const defaultBackendSizes = [
+  { id: 1, name: 'XS', sort_order: 1, status: 'active' },
+  { id: 2, name: 'S', sort_order: 2, status: 'active' },
+  { id: 3, name: 'M', sort_order: 3, status: 'active' },
+  { id: 4, name: 'L', sort_order: 4, status: 'active' },
+  { id: 5, name: 'XL', sort_order: 5, status: 'active' },
+  { id: 6, name: 'XXL', sort_order: 6, status: 'active' },
+  { id: 7, name: '3XL', sort_order: 7, status: 'active' },
+  { id: 8, name: '4XL', sort_order: 8, status: 'active' },
+  { id: 9, name: '5XL', sort_order: 9, status: 'active' },
+  { id: 10, name: 'Free Size', sort_order: 10, status: 'active' }
 ];
 
 const Collections = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const { addToCart } = useCart();
   const { toggleWishlist: toggleWishlistContext, isInWishlist } = useWishlist();
+
+  const getInitialCategoryId = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const catId = params.get('category_id') || params.get('cat');
+      if (catId) {
+        const parsedId = parseInt(catId, 10);
+        return !isNaN(parsedId) ? parsedId : null;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const getInitialSelectedSizes = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const sizeParam = params.get('size_id') || params.get('size');
+      if (sizeParam) {
+        return sizeParam
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !isNaN(n));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  };
+
+  const getInitialSearchKeyword = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('q') || params.get('search');
+      return q ? q.trim() : '';
+    } catch (e) {
+      console.error(e);
+    }
+    return '';
+  };
 
   // API State
   const [variants, setVariants] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
+  const [availableSizes, setAvailableSizes] = useState(defaultBackendSizes);
   const [isLoading, setIsLoading] = useState(true);
   
   // Pagination State
@@ -41,12 +87,12 @@ const Collections = () => {
   const [totalRecords, setTotalRecords] = useState(0);
 
   // Active Applied Filters State
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(getInitialCategoryId);
+  const [selectedSizes, setSelectedSizes] = useState(getInitialSelectedSizes);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [sortBy, setSortBy] = useState('newest');
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState(getInitialSearchKeyword);
   
   // Desktop Accordions Open/Closed State
   const [openAccordions, setOpenAccordions] = useState({
@@ -65,9 +111,14 @@ const Collections = () => {
 
   // Temporary State for Mobile Drawer Draft Changes
   const [draftCategory, setDraftCategory] = useState(null);
-  const [draftSize, setDraftSize] = useState(null);
+  const [draftSizes, setDraftSizes] = useState([]);
   const [draftInStock, setDraftInStock] = useState(false);
   const [draftMaxPrice, setDraftMaxPrice] = useState(3000);
+
+  // Scroll to top whenever the collections page mounts or query parameters change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -92,45 +143,72 @@ const Collections = () => {
     };
   }, [isMobileDrawerOpen]);
 
-  // Fetch Categories
+  // Fetch Categories & Available Sizes from backend
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchInitialFilterData = async () => {
+      // 1. Fetch Categories
       try {
-        const res = await fetch(`${API_BASE_URL}/category/list.php?limit=100`);
-        const data = await res.json();
-        if (data.status && data.data && data.data.categories) {
-          setCategoriesList(data.data.categories);
+        const catRes = await fetch(`${API_BASE_URL}/category/list.php?limit=100`);
+        const catData = await catRes.json();
+        if (catData.status && catData.data && catData.data.categories) {
+          const activeOnly = catData.data.categories.filter((c) => c.status === 'active');
+          setCategoriesList(activeOnly.length > 0 ? activeOnly : catData.data.categories);
         }
       } catch (err) {
         console.error('Failed to fetch categories:', err);
       }
-    };
-    fetchCategories();
-  }, []);
 
-  // Parse Category & Search Query from URL Query Parameters
+      // 2. Fetch all Sizes from backend Size API
+      try {
+        const headers = {};
+        const authToken = token || localStorage.getItem('vivisha_auth_token') || localStorage.getItem('token') || localStorage.getItem('admin_token');
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        const sizeRes = await fetch(`${API_BASE_URL}/size/list.php?limit=100&status=active`, { headers });
+        const sizeData = await sizeRes.json();
+        if (sizeData.status && sizeData.data && sizeData.data.sizes && sizeData.data.sizes.length > 0) {
+          const activeSizes = sizeData.data.sizes.filter((s) => s.status === 'active');
+          const sorted = (activeSizes.length > 0 ? activeSizes : sizeData.data.sizes).sort(
+            (a, b) => (a.sort_order ?? a.id) - (b.sort_order ?? b.id)
+          );
+          setAvailableSizes(sorted);
+        }
+      } catch (err) {
+        console.error('Failed to fetch sizes from size API:', err);
+      }
+    };
+    fetchInitialFilterData();
+  }, [token]);
+
+  // Parse Category, Size & Search Query from URL Query Parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const catId = params.get('category_id') || params.get('cat');
     if (catId) {
       const parsedId = parseInt(catId, 10);
-      if (!isNaN(parsedId)) {
-        setSelectedCategory(parsedId);
-      }
+      setSelectedCategory(!isNaN(parsedId) ? parsedId : null);
     } else {
       setSelectedCategory(null);
     }
-    const q = params.get('q') || params.get('search');
-    if (q) {
-      setSearchKeyword(q.trim());
-    } else {
-      setSearchKeyword('');
+
+    const sizeParam = params.get('size_id') || params.get('size');
+    if (sizeParam) {
+      const parsedSizes = sizeParam
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n));
+      setSelectedSizes(parsedSizes);
     }
+
+    const q = params.get('q') || params.get('search');
+    setSearchKeyword(q ? q.trim() : '');
     setCurrentPage(1);
   }, [location.search]);
 
   // Fetch Variants
   useEffect(() => {
+    let isCurrent = true;
     const fetchVariants = async () => {
       setIsLoading(true);
       try {
@@ -140,7 +218,7 @@ const Collections = () => {
         query.append('max_price', maxPrice);
         
         if (selectedCategory) query.append('category_id', selectedCategory);
-        if (selectedSize) query.append('size_id', selectedSize);
+        if (selectedSizes.length === 1) query.append('size_id', selectedSizes[0]);
         if (inStockOnly) query.append('stock_status', 'in_stock');
         if (searchKeyword) query.append('q', searchKeyword);
         
@@ -157,21 +235,37 @@ const Collections = () => {
 
         const res = await fetch(`${API_BASE_URL}/varient/list.php?${query.toString()}`);
         const data = await res.json();
-        if (data.status && data.data) {
-          setVariants(data.data.variants || []);
+        if (isCurrent && data.status && data.data) {
+          let resultVariants = data.data.variants || [];
+          
+          // Handle client-side multi-size filtering when more than 1 size is selected
+          if (selectedSizes.length > 1) {
+            resultVariants = resultVariants.filter(
+              (v) => v.size && selectedSizes.includes(v.size.id)
+            );
+          }
+
+          setVariants(resultVariants);
           if (data.data.pagination) {
-            setTotalPages(data.data.pagination.total_pages);
-            setTotalRecords(data.data.pagination.total_records);
+            setTotalPages(selectedSizes.length > 1 ? (resultVariants.length > 0 ? 1 : 0) : data.data.pagination.total_pages);
+            setTotalRecords(selectedSizes.length > 1 ? resultVariants.length : data.data.pagination.total_records);
           }
         }
       } catch (err) {
-        console.error('Failed to fetch variants:', err);
+        if (isCurrent) {
+          console.error('Failed to fetch variants:', err);
+        }
       } finally {
-        setIsLoading(false);
+        if (isCurrent) {
+          setIsLoading(false);
+        }
       }
     };
     fetchVariants();
-  }, [currentPage, selectedCategory, selectedSize, inStockOnly, maxPrice, sortBy, searchKeyword]);
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentPage, selectedCategory, selectedSizes, inStockOnly, maxPrice, sortBy, searchKeyword]);
 
   const toggleAccordion = (key) => {
     setOpenAccordions(prev => ({
@@ -205,10 +299,39 @@ const Collections = () => {
     addToCart(cartItem, 1);
   };
 
-  const handleBuyNow = (variant, e) => {
+  const handleBuyNow = async (variant, e) => {
     e.stopPropagation();
-    handleAddToCart(variant, e);
-    if (isAuthenticated) {
+    if (!variant || !variant.id) return;
+    if (variant.stock?.stock_status === 'out_of_stock') return;
+
+    const cartItem = {
+      id: variant.product.id,
+      name: variant.product.name,
+      price: parseFloat(variant.pricing.selling_price),
+      image: variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '',
+      variantId: variant.id
+    };
+
+    if (!isAuthenticated) {
+      const buyNowData = {
+        buyNow: true,
+        variantId: variant.id,
+        quantity: 1,
+        product: cartItem
+      };
+      sessionStorage.setItem('vivisha_buynow_pending', JSON.stringify(buyNowData));
+      navigate('/login', {
+        state: {
+          from: location.pathname + location.search,
+          buyNow: true,
+          buyNowItem: buyNowData
+        }
+      });
+      return;
+    }
+
+    const success = await addToCart(cartItem, 1);
+    if (success) {
       navigate('/cart');
     }
   };
@@ -217,23 +340,34 @@ const Collections = () => {
     if (isDraft) {
       setDraftCategory(draftCategory === categoryId ? null : categoryId);
     } else {
-      setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
+      const nextCategory = selectedCategory === categoryId ? null : categoryId;
+      setSelectedCategory(nextCategory);
       setCurrentPage(1);
+      if (nextCategory) {
+        navigate(`/collections?category_id=${nextCategory}`, { replace: true });
+      } else {
+        navigate('/collections', { replace: true });
+      }
     }
   };
 
   const handleSizeToggle = (sizeId, isDraft = false) => {
     if (isDraft) {
-      setDraftSize(draftSize === sizeId ? null : sizeId);
+      setDraftSizes((prev) =>
+        prev.includes(sizeId) ? prev.filter((id) => id !== sizeId) : [...prev, sizeId]
+      );
     } else {
-      setSelectedSize(selectedSize === sizeId ? null : sizeId);
+      setSelectedSizes((prev) => {
+        const next = prev.includes(sizeId) ? prev.filter((id) => id !== sizeId) : [...prev, sizeId];
+        return next;
+      });
       setCurrentPage(1);
     }
   };
 
   const openMobileDrawer = () => {
     setDraftCategory(selectedCategory);
-    setDraftSize(selectedSize);
+    setDraftSizes(selectedSizes);
     setDraftInStock(inStockOnly);
     setDraftMaxPrice(maxPrice);
     setIsMobileDrawerOpen(true);
@@ -241,23 +375,28 @@ const Collections = () => {
 
   const applyMobileDrawer = () => {
     setSelectedCategory(draftCategory);
-    setSelectedSize(draftSize);
+    setSelectedSizes(draftSizes);
     setInStockOnly(draftInStock);
     setMaxPrice(draftMaxPrice);
     setCurrentPage(1);
     setIsMobileDrawerOpen(false);
+    if (draftCategory) {
+      navigate(`/collections?category_id=${draftCategory}`, { replace: true });
+    } else {
+      navigate('/collections', { replace: true });
+    }
   };
 
   const clearMobileDrawer = () => {
     setDraftCategory(null);
-    setDraftSize(null);
+    setDraftSizes([]);
     setDraftInStock(false);
     setDraftMaxPrice(3000);
   };
 
   const resetAllFilters = () => {
     setSelectedCategory(null);
-    setSelectedSize(null);
+    setSelectedSizes([]);
     setInStockOnly(false);
     setMaxPrice(3000);
     setSearchKeyword('');
@@ -282,7 +421,7 @@ const Collections = () => {
 
   const activeFiltersCount =
     (selectedCategory !== null ? 1 : 0) +
-    (selectedSize !== null ? 1 : 0) +
+    (selectedSizes.length > 0 ? selectedSizes.length : 0) +
     (inStockOnly ? 1 : 0) +
     (maxPrice < 3000 ? 1 : 0) +
     (searchKeyword ? 1 : 0);
@@ -317,7 +456,11 @@ const Collections = () => {
               <div className="accordion-content">
                 <button
                   className={`cat-filter-btn ${selectedCategory === null ? 'active' : ''}`}
-                  onClick={() => { setSelectedCategory(null); setCurrentPage(1); }}
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setCurrentPage(1);
+                    navigate('/collections', { replace: true });
+                  }}
                 >
                   All Categories
                 </button>
@@ -395,17 +538,21 @@ const Collections = () => {
             </div>
             {openAccordions.size && (
               <div className="accordion-content">
-                <div className="size-pills-grid">
-                  {availableSizesList.map((size) => (
-                    <button
-                      key={size.id}
-                      className={`size-pill-btn ${selectedSize === size.id ? 'active' : ''}`}
-                      onClick={() => handleSizeToggle(size.id, false)}
-                    >
-                      {size.name}
-                    </button>
-                  ))}
-                </div>
+                {availableSizes.length === 0 ? (
+                  <p style={{ fontSize: '0.85rem', color: '#888', margin: '8px 0' }}>No sizes available</p>
+                ) : (
+                  <div className="size-pills-grid">
+                    {availableSizes.map((size) => (
+                      <button
+                        key={size.id}
+                        className={`size-pill-btn ${selectedSizes.includes(size.id) ? 'active' : ''}`}
+                        onClick={() => handleSizeToggle(size.id, false)}
+                      >
+                        {size.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -642,17 +789,21 @@ const Collections = () => {
 
             <div className="drawer-section">
               <h4 className="drawer-section-title">Size</h4>
-              <div className="size-pills-grid">
-                {availableSizesList.map((size) => (
-                  <button
-                    key={size.id}
-                    className={`size-pill-btn ${draftSize === size.id ? 'active' : ''}`}
-                    onClick={() => handleSizeToggle(size.id, true)}
-                  >
-                    {size.name}
-                  </button>
-                ))}
-              </div>
+              {availableSizes.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: '#888', margin: '8px 0' }}>No sizes available</p>
+              ) : (
+                <div className="size-pills-grid">
+                  {availableSizes.map((size) => (
+                    <button
+                      key={size.id}
+                      className={`size-pill-btn ${draftSizes.includes(size.id) ? 'active' : ''}`}
+                      onClick={() => handleSizeToggle(size.id, true)}
+                    >
+                      {size.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

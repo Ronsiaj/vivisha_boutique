@@ -48,7 +48,7 @@ const AdminVariants = () => {
       const prods = await prodRes.json();
       const szs = await sizeRes.json();
       const cols = await colRes.json();
-      
+
       if (prods.status) setProducts(prods.data.products);
       if (szs.status) setSizes(szs.data.sizes);
       if (cols.status) setColours(cols.data.colors);
@@ -94,9 +94,9 @@ const AdminVariants = () => {
     if (type === 'file') {
       setFormData(prev => ({ ...prev, [name]: Array.from(files) }));
     } else {
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: type === 'checkbox' ? checked : value 
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
       }));
     }
   };
@@ -108,8 +108,8 @@ const AdminVariants = () => {
       setFormData({
         id: variant.id,
         product_id: variant.product?.id || variant.product_id || '',
-        size_id: variant.size?.id || variant.size_id || '',
-        color_id: variant.color?.id || variant.color_id || '',
+        size_id: variant.size?.id || '',
+        color_id: variant.color?.id || '',
         sku: variant.sku || '',
         variant_name: variant.variant_name || '',
         original_price: variant.pricing?.original_price ?? variant.original_price ?? '0.00',
@@ -119,7 +119,7 @@ const AdminVariants = () => {
         reserved_quantity: variant.stock?.reserved_quantity ?? variant.reserved_quantity ?? '0',
         low_stock_limit: variant.stock?.low_stock_limit ?? variant.low_stock_limit ?? '5',
         is_available: !!variant.is_available,
-        images: [] 
+        images: []
       });
     } else {
       setFormData({
@@ -158,13 +158,13 @@ const AdminVariants = () => {
     setIsSaving(true);
     setError('');
 
-    const url = modalMode === 'add' 
+    const url = modalMode === 'add'
       ? 'http://localhost/vivisha_boutique/backend/api/varient/create.php'
       : 'http://localhost/vivisha_boutique/backend/api/varient/update.php';
 
     const payload = new FormData();
     if (modalMode === 'edit') payload.append('id', formData.id);
-    
+
     payload.append('product_id', formData.product_id);
     if (formData.size_id) payload.append('size_id', formData.size_id);
     if (formData.color_id) payload.append('color_id', formData.color_id);
@@ -199,10 +199,10 @@ const AdminVariants = () => {
         body: payload
       });
       const result = await response.json();
-      
+
       if (result.status) {
         closeModal();
-        fetchVariants(currentPage); 
+        fetchVariants(currentPage);
       } else {
         setError(result.message || 'Operation failed');
       }
@@ -267,12 +267,10 @@ const AdminVariants = () => {
                   </tr>
                 ) : (
                   variants.map(vari => {
-                    const sellingPrice = vari.pricing?.selling_price ?? vari.selling_price ?? vari.pricing?.original_price ?? vari.original_price;
-                    const originalPrice = vari.pricing?.original_price ?? vari.original_price;
-                    const stockQty = vari.stock?.stock_quantity ?? vari.stock_quantity ?? '0';
-                    const lowLimit = vari.stock?.low_stock_limit ?? vari.low_stock_limit ?? '5';
-                    const productName = vari.product?.name || vari.product_name || '-';
-                    const hasDiscount = originalPrice && sellingPrice && parseFloat(originalPrice) > parseFloat(sellingPrice);
+                    const price = vari.pricing?.selling_price ?? vari.selling_price ?? vari.pricing?.original_price ?? vari.original_price ?? '0.00';
+                    const productName = vari.product?.name ?? vari.product_name ?? '-';
+                    const stockQty = vari.stock?.stock_quantity ?? vari.stock_quantity ?? 0;
+                    const lowStockLimit = vari.stock?.low_stock_limit ?? vari.low_stock_limit ?? 5;
 
                     return (
                       <tr key={vari.id}>
@@ -281,27 +279,22 @@ const AdminVariants = () => {
                         <td>
                           {vari.size?.name ? <span style={{ marginRight: '8px', padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', fontWeight: '500' }}>{vari.size.name}</span> : null}
                           {vari.color?.name ? (
-                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                               <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: vari.color.hex_code, border: '1px solid #e5e7eb' }}></span>
-                               {vari.color.name}
-                             </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: vari.color.hex_code, border: '1px solid #e5e7eb' }}></span>
+                              {vari.color.name}
+                            </span>
                           ) : null}
                         </td>
                         <td style={{ fontWeight: '600', color: '#059669' }}>
-                          ₹{sellingPrice !== undefined && sellingPrice !== null ? parseFloat(sellingPrice).toFixed(2) : '-'}
-                          {hasDiscount && (
-                            <span style={{ display: 'block', fontSize: '0.75rem', color: '#9ca3af', textDecoration: 'line-through', fontWeight: '400' }}>
-                              ₹{parseFloat(originalPrice).toFixed(2)}
-                            </span>
-                          )}
+                          ₹{price}
                         </td>
                         <td>
-                          <span className={`admin-badge ${parseInt(stockQty) > parseInt(lowLimit) ? 'admin-badge-active' : 'admin-badge-blocked'}`}>
+                          <span className={`admin-badge ${parseInt(stockQty) > parseInt(lowStockLimit) ? 'admin-badge-active' : 'admin-badge-blocked'}`}>
                             {stockQty} in stock
                           </span>
                         </td>
                         <td style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center', height: '100%', minHeight: '52px' }}>
-                        <button 
+                        <button
                           onClick={() => openModal('view', vari)}
                           className="admin-action-btn admin-action-view"
                         >
@@ -311,7 +304,7 @@ const AdminVariants = () => {
                           </svg>
                           View
                         </button>
-                        <button 
+                        <button
                           onClick={() => openModal('edit', vari)}
                           className="admin-action-btn admin-action-edit"
                         >
@@ -322,21 +315,21 @@ const AdminVariants = () => {
                           Edit
                         </button>
                       </td>
-                    </tr>
-                  );
-                })
-              )}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
         )}
-        
+
         {!isLoading && totalPages > 1 && (
           <div className="admin-pagination-wrapper">
             <div className="admin-pagination-info">
               Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalRecords)} of {totalRecords} variants
             </div>
-            <AdminPagination 
+            <AdminPagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={(page) => fetchVariants(page)}
@@ -357,212 +350,212 @@ const AdminVariants = () => {
                 &times;
               </button>
             </div>
-            
+
             <div className="admin-modal-body">
 
-            {error && (
-              <div style={{ marginBottom: '20px', padding: '12px 16px', backgroundColor: '#fdf2f8', color: '#9d174d', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid #fbcfe8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                {error}
-              </div>
-            )}
+              {error && (
+                <div style={{ marginBottom: '20px', padding: '12px 16px', backgroundColor: '#fdf2f8', color: '#9d174d', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid #fbcfe8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                  {error}
+                </div>
+              )}
 
-            {isReadOnly ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div className="admin-info-grid">
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">SKU</span>
-                    <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{formData.sku}</span>
-                  </div>
-                  
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Product</span>
-                    <span style={{ fontSize: '0.95rem', color: '#374151', fontWeight: '500' }}>
-                      {products.find(p => p.id === parseInt(formData.product_id))?.name || '-'}
-                    </span>
-                  </div>
+              {isReadOnly ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="admin-info-grid">
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">SKU</span>
+                      <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{formData.sku}</span>
+                    </div>
 
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Size</span>
-                    <span style={{ fontSize: '0.95rem', color: '#374151' }}>
-                      {sizes.find(s => s.id === parseInt(formData.size_id))?.name || 'None'}
-                    </span>
-                  </div>
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Colour</span>
-                    <span style={{ fontSize: '0.95rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {(() => {
-                        const col = colours.find(c => c.id === parseInt(formData.color_id));
-                        return col ? (
-                          <><span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: col.hex_code, border: '1px solid #e5e7eb' }}></span> {col.name}</>
-                        ) : 'None';
-                      })()}
-                    </span>
-                  </div>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Product</span>
+                      <span style={{ fontSize: '0.95rem', color: '#374151', fontWeight: '500' }}>
+                        {products.find(p => p.id === parseInt(formData.product_id))?.name || '-'}
+                      </span>
+                    </div>
 
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Orig Price</span>
-                    <span style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>₹{formData.original_price}</span>
-                  </div>
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Discount</span>
-                    <span style={{ fontSize: '0.95rem', color: '#4b5563' }}>
-                      {formData.discount_type === 'none' ? 'None' : `${formData.discount_type === 'flat' ? '₹' : ''}${formData.discount_value}${formData.discount_type === 'percentage' ? '%' : ''}`}
-                    </span>
-                  </div>
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Stock Qty</span>
-                    <span style={{ fontSize: '1rem', fontWeight: '600', color: parseInt(formData.stock_quantity) > parseInt(formData.low_stock_limit) ? '#059669' : '#dc2626' }}>
-                      {formData.stock_quantity}
-                    </span>
-                  </div>
-                  <div className="admin-info-box">
-                    <span className="admin-info-label">Availability</span>
-                    <span style={{ fontSize: '0.95rem', color: formData.is_available ? '#059669' : '#4b5563', fontWeight: '600' }}>
-                      {formData.is_available ? 'Available' : 'Unavailable'}
-                    </span>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Size</span>
+                      <span style={{ fontSize: '0.95rem', color: '#374151' }}>
+                        {sizes.find(s => s.id === parseInt(formData.size_id))?.name || 'None'}
+                      </span>
+                    </div>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Colour</span>
+                      <span style={{ fontSize: '0.95rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {(() => {
+                          const col = colours.find(c => c.id === parseInt(formData.color_id));
+                          return col ? (
+                            <><span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: col.hex_code, border: '1px solid #e5e7eb' }}></span> {col.name}</>
+                          ) : 'None';
+                        })()}
+                      </span>
+                    </div>
+
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Orig Price</span>
+                      <span style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>₹{formData.original_price}</span>
+                    </div>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Discount</span>
+                      <span style={{ fontSize: '0.95rem', color: '#4b5563' }}>
+                        {formData.discount_type === 'none' ? 'None' : `${formData.discount_type === 'flat' ? '₹' : ''}${formData.discount_value}${formData.discount_type === 'percentage' ? '%' : ''}`}
+                      </span>
+                    </div>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Stock Qty</span>
+                      <span style={{ fontSize: '1rem', fontWeight: '600', color: parseInt(formData.stock_quantity) > parseInt(formData.low_stock_limit) ? '#059669' : '#dc2626' }}>
+                        {formData.stock_quantity}
+                      </span>
+                    </div>
+                    <div className="admin-info-box">
+                      <span className="admin-info-label">Availability</span>
+                      <span style={{ fontSize: '0.95rem', color: formData.is_available ? '#059669' : '#4b5563', fontWeight: '600' }}>
+                        {formData.is_available ? 'Available' : 'Unavailable'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="admin-label">Select Product <span style={{color: '#ef4444'}}>*</span></label>
-                    <select 
-                      name="product_id" 
-                      value={formData.product_id} 
-                      onChange={handleInputChange}
-                      required
-                      className="admin-input"
-                    >
-                      <option value="" disabled>Choose a product</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </div>
+              ) : (
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-                  <div>
-                    <label className="admin-label">SKU <span style={{color: '#ef4444'}}>*</span></label>
-                    <input 
-                      type="text" name="sku" value={formData.sku} onChange={handleInputChange} required
-                      placeholder="e.g. SAREE-RED-M"
-                      className="admin-input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="admin-label">Variant Name</label>
-                    <input 
-                      type="text" name="variant_name" value={formData.variant_name} onChange={handleInputChange} 
-                      placeholder="Optional display name"
-                      className="admin-input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="admin-label">Size</label>
-                    <select 
-                      name="size_id" value={formData.size_id} onChange={handleInputChange}
-                      className="admin-input"
-                    >
-                      <option value="">No specific size</option>
-                      {sizes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="admin-label">Colour</label>
-                    <select 
-                      name="color_id" value={formData.color_id} onChange={handleInputChange}
-                      className="admin-input"
-                    >
-                      <option value="">No specific colour</option>
-                      {colours.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="admin-label">Original Price (₹) <span style={{color: '#ef4444'}}>*</span></label>
-                    <input 
-                      type="number" step="0.01" name="original_price" value={formData.original_price} onChange={handleInputChange} required
-                      className="admin-input"
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div>
-                      <label className="admin-label">Discount</label>
-                      <select 
-                        name="discount_type" value={formData.discount_type} onChange={handleInputChange}
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className="admin-label">Select Product <span style={{ color: '#ef4444' }}>*</span></label>
+                      <select
+                        name="product_id"
+                        value={formData.product_id}
+                        onChange={handleInputChange}
+                        required
                         className="admin-input"
                       >
-                        <option value="none">None</option>
-                        <option value="percentage">%</option>
-                        <option value="flat">Flat (₹)</option>
+                        <option value="" disabled>Choose a product</option>
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className="admin-label">Value</label>
-                      <input 
-                        type="number" step="0.01" name="discount_value" value={formData.discount_value} onChange={handleInputChange} disabled={formData.discount_type === 'none'}
-                        className="admin-input"
-                        style={{ backgroundColor: formData.discount_type === 'none' ? '#f3f4f6' : '#fff' }}
-                      />
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="admin-label">Stock Quantity <span style={{color: '#ef4444'}}>*</span></label>
-                    <input 
-                      type="number" name="stock_quantity" value={formData.stock_quantity} onChange={handleInputChange} required min="0"
-                      className="admin-input"
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div>
-                      <label className="admin-label">Reserved</label>
-                      <input 
-                        type="number" name="reserved_quantity" value={formData.reserved_quantity} onChange={handleInputChange} min="0"
+                      <label className="admin-label">SKU <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="text" name="sku" value={formData.sku} onChange={handleInputChange} required
+                        placeholder="e.g. SAREE-RED-M"
                         className="admin-input"
                       />
                     </div>
+
                     <div>
-                      <label className="admin-label">Low Limit</label>
-                      <input 
-                        type="number" name="low_stock_limit" value={formData.low_stock_limit} onChange={handleInputChange} min="0"
+                      <label className="admin-label">Variant Name</label>
+                      <input
+                        type="text" name="variant_name" value={formData.variant_name} onChange={handleInputChange}
+                        placeholder="Optional display name"
                         className="admin-input"
                       />
                     </div>
-                  </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151', cursor: 'pointer' }}>
-                      <input type="checkbox" name="is_available" checked={formData.is_available} onChange={handleInputChange} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                      Is Available for Sale
-                    </label>
-                  </div>
+                    <div>
+                      <label className="admin-label">Size</label>
+                      <select
+                        name="size_id" value={formData.size_id} onChange={handleInputChange}
+                        className="admin-input"
+                      >
+                        <option value="">No specific size</option>
+                        {sizes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
 
-                  {modalMode === 'add' && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label className="admin-label">Variant Images (Max 10)</label>
-                      <div style={{ border: '2px dashed #d1d5db', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#f9fafb' }}>
-                        <input 
-                          type="file" 
-                          name="images" 
-                          onChange={handleInputChange} 
-                          accept="image/jpeg,image/png,image/webp"
-                          multiple
-                          style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.875rem', cursor: 'pointer' }}
+                    <div>
+                      <label className="admin-label">Colour</label>
+                      <select
+                        name="color_id" value={formData.color_id} onChange={handleInputChange}
+                        className="admin-input"
+                      >
+                        <option value="">No specific colour</option>
+                        {colours.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="admin-label">Original Price (₹) <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="number" step="0.01" name="original_price" value={formData.original_price} onChange={handleInputChange} required
+                        className="admin-input"
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label className="admin-label">Discount</label>
+                        <select
+                          name="discount_type" value={formData.discount_type} onChange={handleInputChange}
+                          className="admin-input"
+                        >
+                          <option value="none">None</option>
+                          <option value="percentage">%</option>
+                          <option value="flat">Flat (₹)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="admin-label">Value</label>
+                        <input
+                          type="number" step="0.01" name="discount_value" value={formData.discount_value} onChange={handleInputChange} disabled={formData.discount_type === 'none'}
+                          className="admin-input"
+                          style={{ backgroundColor: formData.discount_type === 'none' ? '#f3f4f6' : '#fff' }}
                         />
                       </div>
                     </div>
-                  )}
 
-                </div>
-              </form>
-            )}
+                    <div>
+                      <label className="admin-label">Stock Quantity <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="number" name="stock_quantity" value={formData.stock_quantity} onChange={handleInputChange} required min="0"
+                        className="admin-input"
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label className="admin-label">Reserved</label>
+                        <input
+                          type="number" name="reserved_quantity" value={formData.reserved_quantity} onChange={handleInputChange} min="0"
+                          className="admin-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="admin-label">Low Limit</label>
+                        <input
+                          type="number" name="low_stock_limit" value={formData.low_stock_limit} onChange={handleInputChange} min="0"
+                          className="admin-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: '600', color: '#374151', cursor: 'pointer' }}>
+                        <input type="checkbox" name="is_available" checked={formData.is_available} onChange={handleInputChange} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                        Is Available for Sale
+                      </label>
+                    </div>
+
+                    {modalMode === 'add' && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label className="admin-label">Variant Images (Max 10)</label>
+                        <div style={{ border: '2px dashed #d1d5db', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#f9fafb' }}>
+                          <input
+                            type="file"
+                            name="images"
+                            onChange={handleInputChange}
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.875rem', cursor: 'pointer' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                </form>
+              )}
             </div>
 
             <div className="admin-modal-footer">
@@ -570,8 +563,8 @@ const AdminVariants = () => {
                 {isReadOnly ? 'Close' : 'Cancel'}
               </button>
               {!isReadOnly && (
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSaving}
                   onClick={handleSubmit}
                   className="admin-btn admin-btn-primary"
@@ -588,7 +581,7 @@ const AdminVariants = () => {
                 </button>
               )}
             </div>
-            
+
           </div>
         </div>
       )}

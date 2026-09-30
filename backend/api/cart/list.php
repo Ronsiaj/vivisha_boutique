@@ -44,7 +44,7 @@ if ($userId <= 0) {
     sendResponse(false, 'Invalid authenticated user.', null, 401);
 }
 
-function validatePositiveIdFilter(string $value, string $field): ?int
+function cartPositiveId(string $value, string $field): ?int
 {
     if ($value === '') {
         return null;
@@ -57,13 +57,13 @@ function validatePositiveIdFilter(string $value, string $field): ?int
     return (int)$value;
 }
 
-function validateBooleanFilter(string $value, string $field): ?int
+function cartBoolean(string $value, string $field): ?int
 {
     if ($value === '') {
         return null;
     }
 
-    $value = strtolower($value);
+    $value = strtolower(trim($value));
 
     if (in_array($value, ['1', 'true'], true)) {
         return 1;
@@ -77,8 +77,12 @@ function validateBooleanFilter(string $value, string $field): ?int
     return null;
 }
 
-function validatePriceFilter(string $value, string $field): ?float
-{
+function cartDecimal(
+    string $value,
+    string $field,
+    float $min = 0,
+    float $max = 99999999.99
+): ?float {
     if ($value === '') {
         return null;
     }
@@ -87,16 +91,16 @@ function validatePriceFilter(string $value, string $field): ?float
         sendResponse(false, "{$field} must be a valid number.", null, 422);
     }
 
-    $price = (float)$value;
+    $number = (float)$value;
 
-    if ($price < 0 || $price > 99999999.99) {
-        sendResponse(false, "{$field} must be between 0 and 99999999.99.", null, 422);
+    if ($number < $min || $number > $max) {
+        sendResponse(false, "{$field} must be between {$min} and {$max}.", null, 422);
     }
 
-    return round($price, 2);
+    return round($number, 2);
 }
 
-function validateDateFilter(string $value, string $field): void
+function cartDate(string $value, string $field): void
 {
     if ($value === '') {
         return;
@@ -105,13 +109,47 @@ function validateDateFilter(string $value, string $field): void
     $date = DateTime::createFromFormat('Y-m-d', $value);
     $errors = DateTime::getLastErrors();
 
-    $hasErrors = $errors !== false && (
-        $errors['warning_count'] > 0 ||
-        $errors['error_count'] > 0
-    );
-
-    if (!$date || $hasErrors || $date->format('Y-m-d') !== $value) {
+    if (
+        !$date ||
+        ($errors !== false && (
+            $errors['warning_count'] > 0 ||
+            $errors['error_count'] > 0
+        )) ||
+        $date->format('Y-m-d') !== $value
+    ) {
         sendResponse(false, "{$field} must be in YYYY-MM-DD format.", null, 422);
+    }
+}
+
+$allowedParams = [
+    'q',
+    'cart_id',
+    'status',
+    'product_id',
+    'variant_id',
+    'category_id',
+    'hsn_profile_id',
+    'hsn_code',
+    'size_id',
+    'color_id',
+    'is_available',
+    'gst_rate',
+    'min_price',
+    'max_price',
+    'stock_status',
+    'created_from',
+    'created_to',
+    'page',
+    'limit',
+    'sort_by',
+    'sort_order'
+];
+
+foreach (array_keys($_GET) as $param) {
+    if (!in_array($param, $allowedParams, true)) {
+        sendResponse(false, "Invalid query parameter: {$param}.", [
+            'allowed_parameters' => $allowedParams
+        ], 422);
     }
 }
 
@@ -121,19 +159,40 @@ if ($q !== '' && mb_strlen($q) > 200) {
     sendResponse(false, 'Search query must not exceed 200 characters.', null, 422);
 }
 
-$cartIdInput = isset($_GET['cart_id']) ? trim((string)$_GET['cart_id']) : '';
-$productIdInput = isset($_GET['product_id']) ? trim((string)$_GET['product_id']) : '';
-$variantIdInput = isset($_GET['variant_id']) ? trim((string)$_GET['variant_id']) : '';
-$categoryIdInput = isset($_GET['category_id']) ? trim((string)$_GET['category_id']) : '';
-$sizeIdInput = isset($_GET['size_id']) ? trim((string)$_GET['size_id']) : '';
-$colorIdInput = isset($_GET['color_id']) ? trim((string)$_GET['color_id']) : '';
+$cartId = cartPositiveId(
+    isset($_GET['cart_id']) ? trim((string)$_GET['cart_id']) : '',
+    'cart_id'
+);
 
-$cartId = validatePositiveIdFilter($cartIdInput, 'cart_id');
-$productId = validatePositiveIdFilter($productIdInput, 'product_id');
-$variantId = validatePositiveIdFilter($variantIdInput, 'variant_id');
-$categoryId = validatePositiveIdFilter($categoryIdInput, 'category_id');
-$sizeId = validatePositiveIdFilter($sizeIdInput, 'size_id');
-$colorId = validatePositiveIdFilter($colorIdInput, 'color_id');
+$productId = cartPositiveId(
+    isset($_GET['product_id']) ? trim((string)$_GET['product_id']) : '',
+    'product_id'
+);
+
+$variantId = cartPositiveId(
+    isset($_GET['variant_id']) ? trim((string)$_GET['variant_id']) : '',
+    'variant_id'
+);
+
+$categoryId = cartPositiveId(
+    isset($_GET['category_id']) ? trim((string)$_GET['category_id']) : '',
+    'category_id'
+);
+
+$hsnProfileId = cartPositiveId(
+    isset($_GET['hsn_profile_id']) ? trim((string)$_GET['hsn_profile_id']) : '',
+    'hsn_profile_id'
+);
+
+$sizeId = cartPositiveId(
+    isset($_GET['size_id']) ? trim((string)$_GET['size_id']) : '',
+    'size_id'
+);
+
+$colorId = cartPositiveId(
+    isset($_GET['color_id']) ? trim((string)$_GET['color_id']) : '',
+    'color_id'
+);
 
 $cartStatus = isset($_GET['status'])
     ? strtolower(trim((string)$_GET['status']))
@@ -141,34 +200,41 @@ $cartStatus = isset($_GET['status'])
 
 $allowedCartStatuses = ['active', 'converted', 'abandoned'];
 
-if (
-    $cartStatus !== '' &&
-    !in_array($cartStatus, $allowedCartStatuses, true)
-) {
+if ($cartStatus !== '' && !in_array($cartStatus, $allowedCartStatuses, true)) {
     sendResponse(false, 'Invalid cart status.', [
         'allowed_statuses' => $allowedCartStatuses
     ], 422);
 }
 
-$isAvailableInput = isset($_GET['is_available'])
-    ? trim((string)$_GET['is_available'])
+$hsnCode = isset($_GET['hsn_code'])
+    ? trim((string)$_GET['hsn_code'])
     : '';
 
-$isAvailable = validateBooleanFilter(
-    $isAvailableInput,
+if ($hsnCode !== '' && !preg_match('/^(?:\d{4}|\d{6}|\d{8})$/', $hsnCode)) {
+    sendResponse(false, 'hsn_code must contain exactly 4, 6 or 8 digits.', null, 422);
+}
+
+$isAvailable = cartBoolean(
+    isset($_GET['is_available']) ? trim((string)$_GET['is_available']) : '',
     'is_available'
 );
 
-$minPriceInput = isset($_GET['min_price'])
-    ? trim((string)$_GET['min_price'])
-    : '';
+$gstRate = cartDecimal(
+    isset($_GET['gst_rate']) ? trim((string)$_GET['gst_rate']) : '',
+    'gst_rate',
+    0,
+    100
+);
 
-$maxPriceInput = isset($_GET['max_price'])
-    ? trim((string)$_GET['max_price'])
-    : '';
+$minPrice = cartDecimal(
+    isset($_GET['min_price']) ? trim((string)$_GET['min_price']) : '',
+    'min_price'
+);
 
-$minPrice = validatePriceFilter($minPriceInput, 'min_price');
-$maxPrice = validatePriceFilter($maxPriceInput, 'max_price');
+$maxPrice = cartDecimal(
+    isset($_GET['max_price']) ? trim((string)$_GET['max_price']) : '',
+    'max_price'
+);
 
 if (
     $minPrice !== null &&
@@ -205,8 +271,8 @@ $createdTo = isset($_GET['created_to'])
     ? trim((string)$_GET['created_to'])
     : '';
 
-validateDateFilter($createdFrom, 'created_from');
-validateDateFilter($createdTo, 'created_to');
+cartDate($createdFrom, 'created_from');
+cartDate($createdTo, 'created_to');
 
 if (
     $createdFrom !== '' &&
@@ -219,26 +285,23 @@ if (
 $pageInput = $_GET['page'] ?? '1';
 $limitInput = $_GET['limit'] ?? '20';
 
-if (filter_var($pageInput, FILTER_VALIDATE_INT) === false) {
-    sendResponse(false, 'Page must be a valid integer.', null, 422);
+if (
+    filter_var($pageInput, FILTER_VALIDATE_INT) === false ||
+    (int)$pageInput <= 0
+) {
+    sendResponse(false, 'page must be a valid positive integer.', null, 422);
+}
+
+if (
+    filter_var($limitInput, FILTER_VALIDATE_INT) === false ||
+    (int)$limitInput <= 0 ||
+    (int)$limitInput > 100
+) {
+    sendResponse(false, 'limit must be between 1 and 100.', null, 422);
 }
 
 $page = (int)$pageInput;
-
-if ($page < 1) {
-    sendResponse(false, 'Page must be greater than 0.', null, 422);
-}
-
-if (filter_var($limitInput, FILTER_VALIDATE_INT) === false) {
-    sendResponse(false, 'Limit must be a valid integer.', null, 422);
-}
-
 $limit = (int)$limitInput;
-
-if ($limit < 1 || $limit > 100) {
-    sendResponse(false, 'Limit must be between 1 and 100.', null, 422);
-}
-
 $offset = ($page - 1) * $limit;
 
 $allowedSortColumns = [
@@ -246,13 +309,20 @@ $allowedSortColumns = [
     'cart_id' => 'ci.cart_id',
     'product_id' => 'ci.product_id',
     'variant_id' => 'ci.variant_id',
+    'product_name' => 'p.name',
+    'category_name' => 'c.name',
+    'hsn_profile_name' => 'hp.name',
+    'hsn_code' => 'hp.hsn_code',
+    'sku' => 'pv.sku',
+    'variant_name' => 'pv.variant_name',
     'quantity' => 'ci.quantity',
     'unit_price' => 'ci.unit_price',
+    'selling_price' => 'pv.selling_price',
+    'gst_rate' => 'pv.gst_rate',
+    'gst_amount' => 'pv.gst_amount',
+    'price_with_tax' => 'pv.price_with_tax',
     'created_at' => 'ci.created_at',
-    'updated_at' => 'ci.updated_at',
-    'product_name' => 'p.name',
-    'variant_name' => 'pv.variant_name',
-    'selling_price' => 'pv.selling_price'
+    'updated_at' => 'ci.updated_at'
 ];
 
 $sortBy = isset($_GET['sort_by'])
@@ -274,11 +344,10 @@ if (!in_array($sortOrder, ['asc', 'desc'], true)) {
 }
 
 $sortColumn = $allowedSortColumns[$sortBy];
+$sqlSortOrder = strtoupper($sortOrder);
 
 try {
-    $where = [
-        'ca.user_id = :authenticated_user_id'
-    ];
+    $where = ['ca.user_id = :authenticated_user_id'];
 
     $params = [
         ':authenticated_user_id' => $userId
@@ -309,6 +378,16 @@ try {
         $params[':category_id'] = $categoryId;
     }
 
+    if ($hsnProfileId !== null) {
+        $where[] = 'p.hsn_profile_id = :hsn_profile_id';
+        $params[':hsn_profile_id'] = $hsnProfileId;
+    }
+
+    if ($hsnCode !== '') {
+        $where[] = 'hp.hsn_code = :hsn_code';
+        $params[':hsn_code'] = $hsnCode;
+    }
+
     if ($sizeId !== null) {
         $where[] = 'pv.size_id = :size_id';
         $params[':size_id'] = $sizeId;
@@ -324,6 +403,11 @@ try {
         $params[':is_available'] = $isAvailable;
     }
 
+    if ($gstRate !== null) {
+        $where[] = 'pv.gst_rate = :gst_rate';
+        $params[':gst_rate'] = number_format($gstRate, 2, '.', '');
+    }
+
     if ($minPrice !== null) {
         $where[] = 'ci.unit_price >= :min_price';
         $params[':min_price'] = number_format($minPrice, 2, '.', '');
@@ -335,7 +419,9 @@ try {
     }
 
     if ($stockStatus === 'in_stock') {
-        $where[] = '(pv.stock_quantity - pv.reserved_quantity) > 0';
+        $where[] = "
+            (pv.stock_quantity - pv.reserved_quantity) > pv.low_stock_limit
+        ";
     } elseif ($stockStatus === 'low_stock') {
         $where[] = "
             (pv.stock_quantity - pv.reserved_quantity) > 0
@@ -343,7 +429,9 @@ try {
             (pv.stock_quantity - pv.reserved_quantity) <= pv.low_stock_limit
         ";
     } elseif ($stockStatus === 'out_of_stock') {
-        $where[] = '(pv.stock_quantity - pv.reserved_quantity) <= 0';
+        $where[] = "
+            (pv.stock_quantity - pv.reserved_quantity) <= 0
+        ";
     }
 
     if ($createdFrom !== '') {
@@ -357,6 +445,8 @@ try {
     }
 
     if ($q !== '') {
+        $search = '%' . $q . '%';
+
         $where[] = "(
             CAST(ca.id AS CHAR) LIKE :q_cart_id
             OR CAST(ci.id AS CHAR) LIKE :q_cart_item_id
@@ -365,9 +455,12 @@ try {
             OR p.name LIKE :q_product_name
             OR p.slug LIKE :q_product_slug
             OR p.description LIKE :q_product_description
+            OR c.name LIKE :q_category_name
+            OR hp.name LIKE :q_hsn_name
+            OR hp.hsn_code LIKE :q_hsn_code
+            OR hp.description LIKE :q_hsn_description
             OR pv.sku LIKE :q_sku
             OR pv.variant_name LIKE :q_variant_name
-            OR c.name LIKE :q_category_name
             OR s.name LIKE :q_size_name
             OR co.name LIKE :q_color_name
             OR co.hex_code LIKE :q_hex_code
@@ -376,40 +469,42 @@ try {
             OR CAST(pv.original_price AS CHAR) LIKE :q_original_price
             OR CAST(pv.discount_value AS CHAR) LIKE :q_discount_value
             OR CAST(pv.selling_price AS CHAR) LIKE :q_selling_price
+            OR CAST(pv.gst_rate AS CHAR) LIKE :q_gst_rate
+            OR CAST(pv.gst_amount AS CHAR) LIKE :q_gst_amount
+            OR CAST(pv.price_with_tax AS CHAR) LIKE :q_price_with_tax
             OR ca.status LIKE :q_cart_status
-            OR DATE_FORMAT(ci.created_at, '%Y-%m-%d %H:%i:%s') LIKE :q_created_at
-            OR DATE_FORMAT(ci.updated_at, '%Y-%m-%d %H:%i:%s') LIKE :q_updated_at
         )";
 
-        $searchValue = '%' . $q . '%';
-
-        $params[':q_cart_id'] = $searchValue;
-        $params[':q_cart_item_id'] = $searchValue;
-        $params[':q_product_id'] = $searchValue;
-        $params[':q_variant_id'] = $searchValue;
-        $params[':q_product_name'] = $searchValue;
-        $params[':q_product_slug'] = $searchValue;
-        $params[':q_product_description'] = $searchValue;
-        $params[':q_sku'] = $searchValue;
-        $params[':q_variant_name'] = $searchValue;
-        $params[':q_category_name'] = $searchValue;
-        $params[':q_size_name'] = $searchValue;
-        $params[':q_color_name'] = $searchValue;
-        $params[':q_hex_code'] = $searchValue;
-        $params[':q_quantity'] = $searchValue;
-        $params[':q_unit_price'] = $searchValue;
-        $params[':q_original_price'] = $searchValue;
-        $params[':q_discount_value'] = $searchValue;
-        $params[':q_selling_price'] = $searchValue;
-        $params[':q_cart_status'] = $searchValue;
-        $params[':q_created_at'] = $searchValue;
-        $params[':q_updated_at'] = $searchValue;
+        $params[':q_cart_id'] = $search;
+        $params[':q_cart_item_id'] = $search;
+        $params[':q_product_id'] = $search;
+        $params[':q_variant_id'] = $search;
+        $params[':q_product_name'] = $search;
+        $params[':q_product_slug'] = $search;
+        $params[':q_product_description'] = $search;
+        $params[':q_category_name'] = $search;
+        $params[':q_hsn_name'] = $search;
+        $params[':q_hsn_code'] = $search;
+        $params[':q_hsn_description'] = $search;
+        $params[':q_sku'] = $search;
+        $params[':q_variant_name'] = $search;
+        $params[':q_size_name'] = $search;
+        $params[':q_color_name'] = $search;
+        $params[':q_hex_code'] = $search;
+        $params[':q_quantity'] = $search;
+        $params[':q_unit_price'] = $search;
+        $params[':q_original_price'] = $search;
+        $params[':q_discount_value'] = $search;
+        $params[':q_selling_price'] = $search;
+        $params[':q_gst_rate'] = $search;
+        $params[':q_gst_amount'] = $search;
+        $params[':q_price_with_tax'] = $search;
+        $params[':q_cart_status'] = $search;
     }
 
     $whereSql = ' WHERE ' . implode(' AND ', $where);
 
-    $countSql = "
-        SELECT COUNT(*)
+    $baseFrom = "
         FROM cart_items ci
         INNER JOIN carts ca
             ON ca.id = ci.cart_id
@@ -420,27 +515,36 @@ try {
             AND pv.product_id = ci.product_id
         INNER JOIN categories c
             ON c.id = p.category_id
+        LEFT JOIN hsn_profiles hp
+            ON hp.id = p.hsn_profile_id
         LEFT JOIN sizes s
             ON s.id = pv.size_id
         LEFT JOIN colors co
             ON co.id = pv.color_id
-        $whereSql
     ";
 
-    $countStmt = $pdo->prepare($countSql);
+    $summaryStmt = $pdo->prepare(
+        "SELECT
+            COUNT(*) AS total_records,
+            COUNT(DISTINCT ca.id) AS total_carts,
+            COALESCE(SUM(ci.quantity), 0) AS total_quantity,
+            COALESCE(SUM(ci.quantity * ci.unit_price), 0) AS subtotal
+         {$baseFrom}
+         {$whereSql}"
+    );
 
     foreach ($params as $key => $value) {
-        if (is_int($value)) {
-            $countStmt->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $countStmt->bindValue($key, $value, PDO::PARAM_STR);
-        }
+        $summaryStmt->bindValue(
+            $key,
+            $value,
+            is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+        );
     }
 
-    $countStmt->execute();
+    $summaryStmt->execute();
+    $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
 
-    $totalRecords = (int)$countStmt->fetchColumn();
-
+    $totalRecords = (int)$summary['total_records'];
     $totalPages = $totalRecords > 0
         ? (int)ceil($totalRecords / $limit)
         : 0;
@@ -452,8 +556,8 @@ try {
         ], 422);
     }
 
-    $sql = "
-        SELECT
+    $stmt = $pdo->prepare(
+        "SELECT
             ci.id AS cart_item_id,
             ci.cart_id,
             ci.product_id,
@@ -469,6 +573,7 @@ try {
             ca.updated_at AS cart_updated_at,
 
             p.category_id,
+            p.hsn_profile_id,
             p.name AS product_name,
             p.slug AS product_slug,
             p.description AS product_description,
@@ -482,6 +587,11 @@ try {
             c.image AS category_image,
             c.status AS category_status,
 
+            hp.name AS hsn_profile_name,
+            hp.hsn_code,
+            hp.description AS hsn_description,
+            hp.status AS hsn_profile_status,
+
             pv.size_id,
             pv.color_id,
             pv.sku,
@@ -490,6 +600,9 @@ try {
             pv.discount_type,
             pv.discount_value,
             pv.selling_price,
+            pv.gst_rate,
+            pv.gst_amount,
+            pv.price_with_tax,
             pv.stock_quantity,
             pv.reserved_quantity,
             pv.low_stock_limit,
@@ -505,43 +618,19 @@ try {
             co.hex_code,
             co.status AS color_status
 
-        FROM cart_items ci
+         {$baseFrom}
+         {$whereSql}
 
-        INNER JOIN carts ca
-            ON ca.id = ci.cart_id
-
-        INNER JOIN products p
-            ON p.id = ci.product_id
-
-        INNER JOIN product_variants pv
-            ON pv.id = ci.variant_id
-            AND pv.product_id = ci.product_id
-
-        INNER JOIN categories c
-            ON c.id = p.category_id
-
-        LEFT JOIN sizes s
-            ON s.id = pv.size_id
-
-        LEFT JOIN colors co
-            ON co.id = pv.color_id
-
-        $whereSql
-
-        ORDER BY $sortColumn $sortOrder, ci.id DESC
-
-        LIMIT :limit
-        OFFSET :offset
-    ";
-
-    $stmt = $pdo->prepare($sql);
+         ORDER BY {$sortColumn} {$sqlSortOrder}, ci.id DESC
+         LIMIT :limit OFFSET :offset"
+    );
 
     foreach ($params as $key => $value) {
-        if (is_int($value)) {
-            $stmt->bindValue($key, $value, PDO::PARAM_INT);
-        } else {
-            $stmt->bindValue($key, $value, PDO::PARAM_STR);
-        }
+        $stmt->bindValue(
+            $key,
+            $value,
+            is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+        );
     }
 
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -549,17 +638,9 @@ try {
     $stmt->execute();
 
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $formattedItems = [];
-    $cartIds = [];
-
-    foreach ($rows as $row) {
-        $cartIds[(int)$row['cart_id']] = true;
-    }
-
     $primaryImagesByVariant = [];
 
-    if (!empty($rows)) {
+    if ($rows) {
         $variantIds = array_values(array_unique(array_map(
             static fn(array $row): int => (int)$row['variant_id'],
             $rows
@@ -567,8 +648,8 @@ try {
 
         $placeholders = [];
 
-        foreach ($variantIds as $index => $id) {
-            $placeholders[] = ':variant_id_' . $index;
+        foreach ($variantIds as $index => $variantIdValue) {
+            $placeholders[] = ':variant_' . $index;
         }
 
         $imageStmt = $pdo->prepare(
@@ -581,7 +662,7 @@ try {
                 sort_order
              FROM product_variant_images
              WHERE variant_id IN (" . implode(',', $placeholders) . ")
-             AND status = 'active'
+               AND status = 'active'
              ORDER BY
                 variant_id ASC,
                 is_primary DESC,
@@ -589,19 +670,17 @@ try {
                 id ASC"
         );
 
-        foreach ($variantIds as $index => $id) {
+        foreach ($variantIds as $index => $variantIdValue) {
             $imageStmt->bindValue(
-                ':variant_id_' . $index,
-                $id,
+                ':variant_' . $index,
+                $variantIdValue,
                 PDO::PARAM_INT
             );
         }
 
         $imageStmt->execute();
 
-        $images = $imageStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($images as $image) {
+        foreach ($imageStmt->fetchAll(PDO::FETCH_ASSOC) as $image) {
             $imageVariantId = (int)$image['variant_id'];
 
             if (!isset($primaryImagesByVariant[$imageVariantId])) {
@@ -616,18 +695,12 @@ try {
         }
     }
 
-    $subtotal = 0.0;
-    $totalQuantity = 0;
+    $cartItems = [];
 
     foreach ($rows as $row) {
         $stockQuantity = (int)$row['stock_quantity'];
         $reservedQuantity = (int)$row['reserved_quantity'];
-
-        $availableQuantity = $stockQuantity - $reservedQuantity;
-
-        if ($availableQuantity < 0) {
-            $availableQuantity = 0;
-        }
+        $availableQuantity = max(0, $stockQuantity - $reservedQuantity);
 
         if ($availableQuantity <= 0) {
             $calculatedStockStatus = 'out_of_stock';
@@ -641,10 +714,7 @@ try {
         $unitPrice = (float)$row['unit_price'];
         $lineTotal = $quantity * $unitPrice;
 
-        $subtotal += $lineTotal;
-        $totalQuantity += $quantity;
-
-        $formattedItems[] = [
+        $cartItems[] = [
             'cart_item_id' => (int)$row['cart_item_id'],
             'cart_id' => (int)$row['cart_id'],
             'product_id' => (int)$row['product_id'],
@@ -660,6 +730,9 @@ try {
             'product' => [
                 'id' => (int)$row['product_id'],
                 'category_id' => (int)$row['category_id'],
+                'hsn_profile_id' => $row['hsn_profile_id'] !== null
+                    ? (int)$row['hsn_profile_id']
+                    : null,
                 'name' => $row['product_name'],
                 'slug' => $row['product_slug'],
                 'description' => $row['product_description'],
@@ -676,6 +749,16 @@ try {
                 'image' => $row['category_image'],
                 'status' => $row['category_status']
             ],
+
+            'hsn_profile' => $row['hsn_profile_id'] !== null
+                ? [
+                    'id' => (int)$row['hsn_profile_id'],
+                    'name' => $row['hsn_profile_name'],
+                    'hsn_code' => $row['hsn_code'],
+                    'description' => $row['hsn_description'],
+                    'status' => $row['hsn_profile_status']
+                ]
+                : null,
 
             'variant' => [
                 'id' => (int)$row['variant_id'],
@@ -704,7 +787,10 @@ try {
                     'original_price' => $row['original_price'],
                     'discount_type' => $row['discount_type'],
                     'discount_value' => $row['discount_value'],
-                    'current_selling_price' => $row['selling_price'],
+                    'selling_price' => $row['selling_price'],
+                    'gst_rate' => $row['gst_rate'],
+                    'gst_amount' => $row['gst_amount'],
+                    'price_with_tax' => $row['price_with_tax'],
                     'cart_unit_price' => number_format($unitPrice, 2, '.', '')
                 ],
 
@@ -732,13 +818,18 @@ try {
     }
 
     sendResponse(true, 'Cart items retrieved successfully.', [
-        'cart_items' => $formattedItems,
+        'cart_items' => $cartItems,
 
         'summary' => [
-            'total_cart_records' => count($cartIds),
-            'total_items' => count($formattedItems),
-            'total_quantity' => $totalQuantity,
-            'subtotal' => number_format($subtotal, 2, '.', '')
+            'total_cart_records' => (int)$summary['total_carts'],
+            'total_items' => $totalRecords,
+            'total_quantity' => (int)$summary['total_quantity'],
+            'subtotal' => number_format(
+                (float)$summary['subtotal'],
+                2,
+                '.',
+                ''
+            )
         ],
 
         'pagination' => [
@@ -757,9 +848,12 @@ try {
             'product_id' => $productId,
             'variant_id' => $variantId,
             'category_id' => $categoryId,
+            'hsn_profile_id' => $hsnProfileId,
+            'hsn_code' => $hsnCode !== '' ? $hsnCode : null,
             'size_id' => $sizeId,
             'color_id' => $colorId,
             'is_available' => $isAvailable,
+            'gst_rate' => $gstRate,
             'min_price' => $minPrice,
             'max_price' => $maxPrice,
             'stock_status' => $stockStatus !== '' ? $stockStatus : null,
@@ -782,7 +876,6 @@ try {
             : null,
         500
     );
-
 } catch (Throwable $e) {
     sendResponse(
         false,

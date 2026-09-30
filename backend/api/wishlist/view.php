@@ -26,14 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $decoded = authenticate();
 validateJWTData($decoded);
 
-$accountType = getAuthenticatedType($decoded);
-$authenticatedId = getAuthenticatedId($decoded);
-
-if ($authenticatedId <= 0) {
+if (getAuthenticatedId($decoded) <= 0) {
     sendResponse(false, 'Invalid authenticated account.', null, 401);
 }
 
-if ($accountType !== 'user') {
+if (getAuthenticatedType($decoded) !== 'user') {
     sendResponse(false, 'User access only.', null, 403);
 }
 
@@ -44,9 +41,17 @@ if ($userId <= 0) {
     sendResponse(false, 'Invalid authenticated user.', null, 401);
 }
 
-$wishlistIdInput = isset($_GET['id'])
-    ? trim((string)$_GET['id'])
-    : '';
+$allowedParams = ['id'];
+
+foreach (array_keys($_GET) as $param) {
+    if (!in_array($param, $allowedParams, true)) {
+        sendResponse(false, "Invalid query parameter: {$param}.", [
+            'allowed_parameters' => $allowedParams
+        ], 422);
+    }
+}
+
+$wishlistIdInput = trim((string)($_GET['id'] ?? ''));
 
 if ($wishlistIdInput === '') {
     sendResponse(false, 'Wishlist ID is required.', null, 422);
@@ -61,81 +66,48 @@ $wishlistId = (int)$wishlistIdInput;
 try {
     $stmt = $pdo->prepare(
         "SELECT
-            w.id AS wishlist_id,
-            w.user_id,
-            w.product_id,
-            w.variant_id,
-            w.created_at AS wishlist_created_at,
-            w.updated_at AS wishlist_updated_at,
+            w.id AS wishlist_id,w.user_id,w.product_id,w.variant_id,
+            w.created_at AS wishlist_created_at,w.updated_at AS wishlist_updated_at,
 
-            p.category_id,
-            p.name AS product_name,
-            p.slug AS product_slug,
-            p.description AS product_description,
-            p.is_new_arrival,
-            p.is_featured,
-            p.is_best_seller,
-            p.status AS product_status,
-            p.created_at AS product_created_at,
+            p.category_id,p.hsn_profile_id,p.name AS product_name,
+            p.slug AS product_slug,p.description AS product_description,
+            p.is_new_arrival,p.is_featured,p.is_best_seller,
+            p.status AS product_status,p.created_at AS product_created_at,
             p.updated_at AS product_updated_at,
 
-            c.name AS category_name,
-            c.slug AS category_slug,
-            c.description AS category_description,
-            c.image AS category_image,
-            c.sort_order AS category_sort_order,
-            c.status AS category_status,
-            c.created_at AS category_created_at,
-            c.updated_at AS category_updated_at,
+            c.name AS category_name,c.slug AS category_slug,
+            c.description AS category_description,c.image AS category_image,
+            c.sort_order AS category_sort_order,c.status AS category_status,
+            c.created_at AS category_created_at,c.updated_at AS category_updated_at,
 
-            pv.size_id,
-            pv.color_id,
-            pv.sku,
-            pv.variant_name,
-            pv.original_price,
-            pv.discount_type,
-            pv.discount_value,
-            pv.selling_price,
-            pv.stock_quantity,
-            pv.reserved_quantity,
-            pv.low_stock_limit,
-            pv.is_available,
-            pv.created_at AS variant_created_at,
+            hp.name AS hsn_profile_name,hp.hsn_code,
+            hp.description AS hsn_description,hp.status AS hsn_profile_status,
+            hp.created_at AS hsn_created_at,hp.updated_at AS hsn_updated_at,
+
+            pv.size_id,pv.color_id,pv.sku,pv.variant_name,
+            pv.original_price,pv.gst_rate,pv.gst_amount,pv.price_with_tax,
+            pv.discount_type,pv.discount_value,pv.selling_price,
+            pv.stock_quantity,pv.reserved_quantity,pv.low_stock_limit,
+            pv.is_available,pv.created_at AS variant_created_at,
             pv.updated_at AS variant_updated_at,
 
-            s.name AS size_name,
-            s.sort_order AS size_sort_order,
-            s.status AS size_status,
-            s.created_at AS size_created_at,
+            s.name AS size_name,s.sort_order AS size_sort_order,
+            s.status AS size_status,s.created_at AS size_created_at,
             s.updated_at AS size_updated_at,
 
-            co.name AS color_name,
-            co.hex_code,
-            co.status AS color_status,
-            co.created_at AS color_created_at,
-            co.updated_at AS color_updated_at
+            co.name AS color_name,co.hex_code,co.status AS color_status,
+            co.created_at AS color_created_at,co.updated_at AS color_updated_at
 
          FROM wishlists w
-
-         INNER JOIN products p
-            ON p.id = w.product_id
-
+         INNER JOIN products p ON p.id=w.product_id
          INNER JOIN product_variants pv
-            ON pv.id = w.variant_id
-            AND pv.product_id = w.product_id
-
-         INNER JOIN categories c
-            ON c.id = p.category_id
-
-         LEFT JOIN sizes s
-            ON s.id = pv.size_id
-
-         LEFT JOIN colors co
-            ON co.id = pv.color_id
-
-         WHERE w.id = :wishlist_id
-         AND w.user_id = :user_id
-
+            ON pv.id=w.variant_id AND pv.product_id=w.product_id
+         INNER JOIN categories c ON c.id=p.category_id
+         LEFT JOIN hsn_profiles hp ON hp.id=p.hsn_profile_id
+         LEFT JOIN sizes s ON s.id=pv.size_id
+         LEFT JOIN colors co ON co.id=pv.color_id
+         WHERE w.id=:wishlist_id
+           AND w.user_id=:user_id
          LIMIT 1"
     );
 
@@ -147,18 +119,16 @@ try {
 
     if (!$wishlist) {
         $existsStmt = $pdo->prepare(
-            "SELECT id, user_id
+            "SELECT id,user_id
              FROM wishlists
-             WHERE id = :wishlist_id
+             WHERE id=:wishlist_id
              LIMIT 1"
         );
 
         $existsStmt->bindValue(':wishlist_id', $wishlistId, PDO::PARAM_INT);
         $existsStmt->execute();
 
-        $existingWishlist = $existsStmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existingWishlist) {
+        if ($existsStmt->fetch(PDO::FETCH_ASSOC)) {
             sendResponse(
                 false,
                 'You are not allowed to view this wishlist item.',
@@ -172,22 +142,12 @@ try {
 
     $imageStmt = $pdo->prepare(
         "SELECT
-            id,
-            variant_id,
-            image,
-            alt_text,
-            is_primary,
-            sort_order,
-            status,
-            created_at,
-            updated_at
+            id,variant_id,image,alt_text,is_primary,
+            sort_order,status,created_at,updated_at
          FROM product_variant_images
-         WHERE variant_id = :variant_id
-         AND status = 'active'
-         ORDER BY
-            is_primary DESC,
-            sort_order ASC,
-            id ASC"
+         WHERE variant_id=:variant_id
+           AND status='active'
+         ORDER BY is_primary DESC,sort_order ASC,id ASC"
     );
 
     $imageStmt->bindValue(
@@ -198,12 +158,10 @@ try {
 
     $imageStmt->execute();
 
-    $images = $imageStmt->fetchAll(PDO::FETCH_ASSOC);
-
     $formattedImages = [];
     $primaryImage = null;
 
-    foreach ($images as $image) {
+    foreach ($imageStmt->fetchAll(PDO::FETCH_ASSOC) as $image) {
         $imageData = [
             'id' => (int)$image['id'],
             'variant_id' => (int)$image['variant_id'],
@@ -218,37 +176,57 @@ try {
 
         $formattedImages[] = $imageData;
 
-        if (
-            $primaryImage === null &&
-            (int)$image['is_primary'] === 1
-        ) {
+        if ($primaryImage === null && (int)$image['is_primary'] === 1) {
             $primaryImage = $imageData;
         }
     }
 
-    if ($primaryImage === null && !empty($formattedImages)) {
+    if ($primaryImage === null && $formattedImages) {
         $primaryImage = $formattedImages[0];
     }
 
     $stockQuantity = (int)$wishlist['stock_quantity'];
     $reservedQuantity = (int)$wishlist['reserved_quantity'];
-
-    $availableQuantity = $stockQuantity - $reservedQuantity;
-
-    if ($availableQuantity < 0) {
-        $availableQuantity = 0;
-    }
+    $availableQuantity = max(0, $stockQuantity - $reservedQuantity);
 
     if ($availableQuantity <= 0) {
         $stockStatus = 'out_of_stock';
-    } elseif (
-        $availableQuantity <=
-        (int)$wishlist['low_stock_limit']
-    ) {
+    } elseif ($availableQuantity <= (int)$wishlist['low_stock_limit']) {
         $stockStatus = 'low_stock';
     } else {
         $stockStatus = 'in_stock';
     }
+
+    $originalPrice = (float)$wishlist['original_price'];
+    $gstRate = (float)$wishlist['gst_rate'];
+    $gstAmount = (float)$wishlist['gst_amount'];
+    $priceWithTax = (float)$wishlist['price_with_tax'];
+    $discountValue = (float)$wishlist['discount_value'];
+    $sellingPrice = (float)$wishlist['selling_price'];
+
+    $discountAmount = max(
+        0,
+        round($priceWithTax - $sellingPrice, 2)
+    );
+
+    $effectiveDiscountPercentage = 0.00;
+
+    if ($wishlist['discount_type'] === 'percentage') {
+        $effectiveDiscountPercentage = $discountValue;
+    } elseif (
+        $wishlist['discount_type'] === 'flat' &&
+        $priceWithTax > 0
+    ) {
+        $effectiveDiscountPercentage = round(
+            ($discountAmount / $priceWithTax) * 100,
+            2
+        );
+    }
+
+    $hasDiscount =
+        $wishlist['discount_type'] !== 'none' &&
+        $discountValue > 0 &&
+        $sellingPrice < $priceWithTax;
 
     $isPurchasable =
         $wishlist['product_status'] === 'active' &&
@@ -264,12 +242,6 @@ try {
             $wishlist['color_status'] === 'active'
         );
 
-    $hasDiscount =
-        $wishlist['discount_type'] !== 'none' &&
-        (float)$wishlist['discount_value'] > 0 &&
-        (float)$wishlist['selling_price'] <
-        (float)$wishlist['original_price'];
-
     sendResponse(true, 'Wishlist item retrieved successfully.', [
         'wishlist' => [
             'id' => (int)$wishlist['wishlist_id'],
@@ -279,6 +251,9 @@ try {
             'product' => [
                 'id' => (int)$wishlist['product_id'],
                 'category_id' => (int)$wishlist['category_id'],
+                'hsn_profile_id' => $wishlist['hsn_profile_id'] !== null
+                    ? (int)$wishlist['hsn_profile_id']
+                    : null,
                 'name' => $wishlist['product_name'],
                 'slug' => $wishlist['product_slug'],
                 'description' => $wishlist['product_description'],
@@ -302,38 +277,89 @@ try {
                 'updated_at' => $wishlist['category_updated_at']
             ],
 
+            'hsn_profile' => $wishlist['hsn_profile_id'] !== null ? [
+                'id' => (int)$wishlist['hsn_profile_id'],
+                'name' => $wishlist['hsn_profile_name'],
+                'hsn_code' => $wishlist['hsn_code'],
+                'description' => $wishlist['hsn_description'],
+                'status' => $wishlist['hsn_profile_status'],
+                'created_at' => $wishlist['hsn_created_at'],
+                'updated_at' => $wishlist['hsn_updated_at']
+            ] : null,
+
             'variant' => [
                 'id' => (int)$wishlist['variant_id'],
                 'sku' => $wishlist['sku'],
                 'variant_name' => $wishlist['variant_name'],
 
-                'size' => $wishlist['size_id'] !== null
-                    ? [
-                        'id' => (int)$wishlist['size_id'],
-                        'name' => $wishlist['size_name'],
-                        'sort_order' => (int)$wishlist['size_sort_order'],
-                        'status' => $wishlist['size_status'],
-                        'created_at' => $wishlist['size_created_at'],
-                        'updated_at' => $wishlist['size_updated_at']
-                    ]
-                    : null,
+                'size' => $wishlist['size_id'] !== null ? [
+                    'id' => (int)$wishlist['size_id'],
+                    'name' => $wishlist['size_name'],
+                    'sort_order' => (int)$wishlist['size_sort_order'],
+                    'status' => $wishlist['size_status'],
+                    'created_at' => $wishlist['size_created_at'],
+                    'updated_at' => $wishlist['size_updated_at']
+                ] : null,
 
-                'color' => $wishlist['color_id'] !== null
-                    ? [
-                        'id' => (int)$wishlist['color_id'],
-                        'name' => $wishlist['color_name'],
-                        'hex_code' => $wishlist['hex_code'],
-                        'status' => $wishlist['color_status'],
-                        'created_at' => $wishlist['color_created_at'],
-                        'updated_at' => $wishlist['color_updated_at']
-                    ]
-                    : null,
+                'color' => $wishlist['color_id'] !== null ? [
+                    'id' => (int)$wishlist['color_id'],
+                    'name' => $wishlist['color_name'],
+                    'hex_code' => $wishlist['hex_code'],
+                    'status' => $wishlist['color_status'],
+                    'created_at' => $wishlist['color_created_at'],
+                    'updated_at' => $wishlist['color_updated_at']
+                ] : null,
 
                 'pricing' => [
-                    'original_price' => $wishlist['original_price'],
+                    'original_price' => number_format(
+                        $originalPrice,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'gst_rate' => number_format(
+                        $gstRate,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'gst_amount' => number_format(
+                        $gstAmount,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'price_with_tax' => number_format(
+                        $priceWithTax,
+                        2,
+                        '.',
+                        ''
+                    ),
                     'discount_type' => $wishlist['discount_type'],
-                    'discount_value' => $wishlist['discount_value'],
-                    'selling_price' => $wishlist['selling_price'],
+                    'discount_value' => number_format(
+                        $discountValue,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'discount_amount' => number_format(
+                        $discountAmount,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'effective_discount_percentage' => number_format(
+                        $effectiveDiscountPercentage,
+                        2,
+                        '.',
+                        ''
+                    ),
+                    'selling_price' => number_format(
+                        $sellingPrice,
+                        2,
+                        '.',
+                        ''
+                    ),
                     'has_discount' => $hasDiscount
                 ],
 
@@ -351,11 +377,9 @@ try {
 
                 'is_available' => (int)$wishlist['is_available'],
                 'is_purchasable' => $isPurchasable,
-
                 'primary_image' => $primaryImage,
                 'images' => $formattedImages,
                 'image_count' => count($formattedImages),
-
                 'created_at' => $wishlist['variant_created_at'],
                 'updated_at' => $wishlist['variant_updated_at']
             ],
@@ -369,17 +393,16 @@ try {
     sendResponse(
         false,
         'Unable to retrieve wishlist item.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500
     );
-
 } catch (Throwable $e) {
     sendResponse(
         false,
         'An unexpected error occurred.',
-        APP_ENV === 'development'
+        defined('APP_ENV') && APP_ENV === 'development'
             ? ['error' => $e->getMessage()]
             : null,
         500

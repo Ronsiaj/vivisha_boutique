@@ -16,8 +16,15 @@ const ContactUs = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    alert('Thank you for reaching out! We will get back to you soon.');
+    const phone = formData.phone ? formData.phone.trim() : 'Not provided';
+    const text = `*New Inquiry - Vivisha Boutique*\n\n` +
+      `👤 *Name:* ${formData.name.trim()}\n` +
+      `📧 *Email:* ${formData.email.trim()}\n` +
+      `📞 *Phone:* ${phone}\n\n` +
+      `💬 *Message:*\n${formData.message.trim()}`;
+
+    const whatsappUrl = `https://wa.me/919597773774?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
     setFormData({ name: '', email: '', phone: '', message: '' });
   };
 
@@ -43,7 +50,7 @@ const ContactUs = () => {
                 <span className="info-icon">📍</span>
                 <div className="info-text">
                   <strong>Visit Us</strong>
-                  <p>123 Fashion Avenue<br />Style District, City 40001</p>
+                  <p>No 8 (1), 1st Street, Anandha Nagar<br />Karaikkudi - 630001.</p>
                 </div>
               </div>
 
@@ -51,7 +58,7 @@ const ContactUs = () => {
                 <span className="info-icon">📞</span>
                 <div className="info-text">
                   <strong>Call Us</strong>
-                  <p>+91 98765 43210</p>
+                  <p>+91 9597773774</p>
                 </div>
               </div>
 
@@ -59,7 +66,7 @@ const ContactUs = () => {
                 <span className="info-icon">✉️</span>
                 <div className="info-text">
                   <strong>Email Us</strong>
-                  <p>hello@vivishaboutique.com</p>
+                  <p>vivishaboutique1131@gmail.com</p>
                 </div>
               </div>
 

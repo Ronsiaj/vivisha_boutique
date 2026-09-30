@@ -26,88 +26,119 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $decoded = authenticate();
 validateJWTData($decoded);
 
-$accountType = getAuthenticatedType($decoded);
-$authenticatedId = getAuthenticatedId($decoded);
+$accountType = strtolower((string)getAuthenticatedType($decoded));
+$authenticatedId = (int)getAuthenticatedId($decoded);
 
 if ($authenticatedId <= 0) {
     sendResponse(false, 'Invalid authenticated account.', null, 401);
 }
 
-if ($accountType !== 'admin') {
-    sendResponse(false, 'Admin access only.', null, 403);
+$allowedAccountTypes = ['admin', 'user'];
+
+if (!in_array($accountType, $allowedAccountTypes, true)) {
+    sendResponse(false, 'Access denied.', [
+        'allowed_account_types' => $allowedAccountTypes
+    ], 403);
 }
-
-$adminAuth = authenticateAdmin();
-checkAdminRole($adminAuth, ['admin']);
-
-$q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-$status = isset($_GET['status']) ? strtolower(trim((string)$_GET['status'])) : '';
-
-$pageInput = $_GET['page'] ?? '1';
-$limitInput = $_GET['limit'] ?? '20';
-
-if (filter_var($pageInput, FILTER_VALIDATE_INT) === false) {
-    sendResponse(false, 'Page must be a valid integer.', null, 422);
-}
-
-$page = (int)$pageInput;
-
-if ($page < 1) {
-    sendResponse(false, 'Page must be greater than 0.', null, 422);
-}
-
-if (filter_var($limitInput, FILTER_VALIDATE_INT) === false) {
-    sendResponse(false, 'Limit must be a valid integer.', null, 422);
-}
-
-$limit = (int)$limitInput;
-
-if ($limit < 1 || $limit > 100) {
-    sendResponse(false, 'Limit must be between 1 and 100.', null, 422);
-}
-
-if ($q !== '' && mb_strlen($q) > 100) {
-    sendResponse(false, 'Search query must not exceed 100 characters.', null, 422);
-}
-
-$allowedStatuses = ['active', 'inactive'];
-
-if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
-    sendResponse(false, 'Invalid status.', [
-        'allowed_statuses' => $allowedStatuses
-    ], 422);
-}
-
-$allowedSortColumns = [
-    'id',
-    'name',
-    'sort_order',
-    'status',
-    'created_at',
-    'updated_at'
-];
-
-$sortBy = isset($_GET['sort_by'])
-    ? trim((string)$_GET['sort_by'])
-    : 'sort_order';
-
-$sortOrder = isset($_GET['sort_order'])
-    ? strtolower(trim((string)$_GET['sort_order']))
-    : 'asc';
-
-if (!in_array($sortBy, $allowedSortColumns, true)) {
-    sendResponse(false, 'Invalid sort_by value.', [
-        'allowed_values' => $allowedSortColumns
-    ], 422);
-}
-
-if (!in_array($sortOrder, ['asc', 'desc'], true)) {
-    sendResponse(false, 'sort_order must be asc or desc.', null, 422);
-}
-
-$offset = ($page - 1) * $limit;
 
 try {
+    if ($accountType === 'admin') {
+        if (function_exists('authenticateAdmin') && function_exists('checkAdminRole')) {
+            $adminAuth = authenticateAdmin();
+            checkAdminRole($adminAuth, ['admin']);
+        }
+    }
+
+    if ($accountType === 'user') {
+        $userStmt = $pdo->prepare("
+            SELECT id, name, mobile, email, status
+            FROM users
+            WHERE id = :id
+            LIMIT 1
+        ");
+        $userStmt->bindValue(':id', $authenticatedId, PDO::PARAM_INT);
+        $userStmt->execute();
+
+        $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            sendResponse(false, 'User account not found.', null, 404);
+        }
+
+        if (($user['status'] ?? '') !== 'active') {
+            sendResponse(false, 'Your account is not active.', [
+                'status' => $user['status']
+            ], 403);
+        }
+    }
+
+    $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+    $status = isset($_GET['status']) ? strtolower(trim((string)$_GET['status'])) : '';
+
+    $pageInput = $_GET['page'] ?? '1';
+    $limitInput = $_GET['limit'] ?? '20';
+
+    if (filter_var($pageInput, FILTER_VALIDATE_INT) === false) {
+        sendResponse(false, 'Page must be a valid integer.', null, 422);
+    }
+
+    $page = (int)$pageInput;
+
+    if ($page < 1) {
+        sendResponse(false, 'Page must be greater than 0.', null, 422);
+    }
+
+    if (filter_var($limitInput, FILTER_VALIDATE_INT) === false) {
+        sendResponse(false, 'Limit must be a valid integer.', null, 422);
+    }
+
+    $limit = (int)$limitInput;
+
+    if ($limit < 1 || $limit > 100) {
+        sendResponse(false, 'Limit must be between 1 and 100.', null, 422);
+    }
+
+    if ($q !== '' && mb_strlen($q) > 100) {
+        sendResponse(false, 'Search query must not exceed 100 characters.', null, 422);
+    }
+
+    $allowedStatuses = ['active', 'inactive'];
+
+    if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
+        sendResponse(false, 'Invalid status.', [
+            'allowed_statuses' => $allowedStatuses
+        ], 422);
+    }
+
+    $allowedSortColumns = [
+        'id',
+        'name',
+        'sort_order',
+        'status',
+        'created_at',
+        'updated_at'
+    ];
+
+    $sortBy = isset($_GET['sort_by'])
+        ? trim((string)$_GET['sort_by'])
+        : 'sort_order';
+
+    $sortOrder = isset($_GET['sort_order'])
+        ? strtolower(trim((string)$_GET['sort_order']))
+        : 'asc';
+
+    if (!in_array($sortBy, $allowedSortColumns, true)) {
+        sendResponse(false, 'Invalid sort_by value.', [
+            'allowed_values' => $allowedSortColumns
+        ], 422);
+    }
+
+    if (!in_array($sortOrder, ['asc', 'desc'], true)) {
+        sendResponse(false, 'sort_order must be asc or desc.', null, 422);
+    }
+
+    $offset = ($page - 1) * $limit;
+
     $where = [];
     $params = [];
 
@@ -116,13 +147,14 @@ try {
             CAST(id AS CHAR) LIKE :q_id
             OR name LIKE :q_name
             OR status LIKE :q_status
+            OR CAST(sort_order AS CHAR) LIKE :q_sort_order
         )";
 
         $searchValue = '%' . $q . '%';
-
         $params[':q_id'] = $searchValue;
         $params[':q_name'] = $searchValue;
         $params[':q_status'] = $searchValue;
+        $params[':q_sort_order'] = $searchValue;
     }
 
     if ($status !== '') {
@@ -134,8 +166,7 @@ try {
         ? ' WHERE ' . implode(' AND ', $where)
         : '';
 
-    $countSql = "SELECT COUNT(*) FROM sizes $whereSql";
-
+    $countSql = "SELECT COUNT(*) FROM sizes" . $whereSql;
     $countStmt = $pdo->prepare($countSql);
 
     foreach ($params as $key => $value) {
@@ -145,9 +176,7 @@ try {
     $countStmt->execute();
 
     $totalRecords = (int)$countStmt->fetchColumn();
-    $totalPages = $totalRecords > 0
-        ? (int)ceil($totalRecords / $limit)
-        : 0;
+    $totalPages = $totalRecords > 0 ? (int)ceil($totalRecords / $limit) : 0;
 
     $sql = "
         SELECT
@@ -181,7 +210,7 @@ try {
         $formattedSizes[] = [
             'id' => (int)$size['id'],
             'name' => $size['name'],
-            'sort_order' => (int)$size['sort_order'],
+            'sort_order' => isset($size['sort_order']) ? (int)$size['sort_order'] : 0,
             'status' => $size['status'],
             'created_at' => $size['created_at'],
             'updated_at' => $size['updated_at']
@@ -205,6 +234,10 @@ try {
         'sorting' => [
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder
+        ],
+        'access' => [
+            'account_type' => $accountType,
+            'authenticated_id' => $authenticatedId
         ]
     ], 200);
 
@@ -212,18 +245,14 @@ try {
     sendResponse(
         false,
         'Unable to retrieve sizes.',
-        APP_ENV === 'development'
-            ? ['error' => $e->getMessage()]
-            : null,
+        APP_ENV === 'development' ? ['error' => $e->getMessage()] : null,
         500
     );
 } catch (Throwable $e) {
     sendResponse(
         false,
         'An unexpected error occurred.',
-        APP_ENV === 'development'
-            ? ['error' => $e->getMessage()]
-            : null,
+        APP_ENV === 'development' ? ['error' => $e->getMessage()] : null,
         500
     );
 }

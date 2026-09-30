@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
 import logo from '../../../assets/images/boutique_logo.png';
 
 const Register = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { register } = useAuth();
+  const { addToCart } = useCart();
 
   const redirectTarget = location.state?.from || '/';
   const isFromCheckout = location.state?.from === '/checkout';
@@ -89,6 +91,24 @@ const Register = () => {
       return;
     }
 
+    // Date of Birth Validation
+    const dob = (formData.date_of_birth || '').trim();
+    if (!dob) {
+      setError('Please select your date of birth.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      setError('Date of birth must be in YYYY-MM-DD format.');
+      return;
+    }
+    const selectedDate = new Date(dob + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(selectedDate.getTime()) || selectedDate > today) {
+      setError('Date of birth cannot be a future date.');
+      return;
+    }
+
     // Password Validation
     if (!formData.password) {
       setError('Please enter a password.');
@@ -129,15 +149,37 @@ const Register = () => {
         name: trimmedName,
         mobile: trimmedMobile,
         email: trimmedEmail,
-        date_of_birth: formData.date_of_birth,
+        date_of_birth: dob,
         password: formData.password
       });
 
       setIsLoading(false);
 
       if (result.success) {
-        // Customer registration redirects to target destination (e.g. /checkout)
-        navigate(redirectTarget);
+        // Check for Buy Now intent
+        const pendingBuyNowStr = sessionStorage.getItem('vivisha_buynow_pending');
+        let pendingBuyNow = null;
+        if (location.state?.buyNow && location.state?.buyNowItem) {
+          pendingBuyNow = location.state.buyNowItem;
+        } else if (pendingBuyNowStr) {
+          try {
+            pendingBuyNow = JSON.parse(pendingBuyNowStr);
+          } catch (err) {
+            pendingBuyNow = null;
+          }
+        }
+
+        if (pendingBuyNow && pendingBuyNow.variantId) {
+          sessionStorage.removeItem('vivisha_buynow_pending');
+          await addToCart(
+            pendingBuyNow.product || { variantId: pendingBuyNow.variantId },
+            pendingBuyNow.quantity || 1,
+            result.token
+          );
+          navigate('/cart');
+        } else {
+          navigate(redirectTarget);
+        }
       } else {
         setError(result.message || 'Registration failed. Please try again.');
       }
@@ -243,7 +285,7 @@ const Register = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="date_of_birth">Date of Birth (Optional)</label>
+            <label htmlFor="date_of_birth">Date of Birth</label>
             <div className="input-with-icon">
               <span className="input-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -260,6 +302,7 @@ const Register = () => {
                 value={formData.date_of_birth}
                 onChange={handleChange}
                 max={new Date().toISOString().split('T')[0]}
+                required
               />
             </div>
           </div>

@@ -1,11 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const Sidebar = ({ isOpen, onClose }) => {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+
+const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
+
+  const [categories, setCategories] = useState(
+    Array.isArray(initialCategories) && initialCategories.length > 0 ? initialCategories : []
+  );
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+
+  // Sync initialCategories if passed or updated from parent
+  useEffect(() => {
+    if (Array.isArray(initialCategories) && initialCategories.length > 0) {
+      setCategories(initialCategories);
+    }
+  }, [initialCategories]);
+
+  // Fetch active categories if not passed or empty
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/category/list.php?limit=100`);
+        const data = await response.json();
+        if (isMounted && data.status && data.data?.categories) {
+          const activeOnly = data.data.categories.filter((c) => c.status === 'active');
+          if (activeOnly.length > 0) {
+            setCategories(activeOnly);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories for mobile sidebar:', err);
+      }
+    };
+
+    if (categories.length === 0) {
+      fetchCategories();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [categories.length]);
 
   const handleLogout = () => {
     logout();
@@ -13,13 +53,20 @@ const Sidebar = ({ isOpen, onClose }) => {
     navigate('/');
   };
 
+  const toggleCategories = () => {
+    setIsCategoriesExpanded((prev) => !prev);
+  };
+
   const menuItems = [
-    { path: '/', label: 'Home', hasArrow: false },
-    { path: '/collections', label: 'Collections', hasArrow: true },
-    { path: '/about', label: 'About Us', hasArrow: false },
-    { path: '/contact', label: 'Contact Us', hasArrow: false },
-    { path: '/privacy-policy', label: 'Privacy Policy', hasArrow: false },
-    { path: '/terms', label: 'Terms and Conditions', hasArrow: false }
+    { id: 'home', path: '/', label: 'Home', hasArrow: false },
+    { id: 'categories', path: '/collections', label: 'Categories', hasArrow: true },
+    { id: 'new_arrivals', path: '/collections?is_new_arrival=1', label: 'New Arrivals', hasArrow: false },
+    { id: 'top_selling', path: '/collections?is_best_seller=1', label: 'Top Selling', hasArrow: false },
+    { id: 'track-order', path: '/track-order', label: 'Order Tracking', hasArrow: false },
+    { id: 'about', path: '/about', label: 'About Us', hasArrow: false },
+    { id: 'contact', path: '/contact', label: 'Contact Us', hasArrow: false },
+    { id: 'privacy-policy', path: '/privacy-policy', label: 'Privacy Policy', hasArrow: false },
+    { id: 'terms', path: '/terms', label: 'Terms and Conditions', hasArrow: false }
   ];
 
   return (
@@ -30,7 +77,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         onClick={onClose}
       ></div>
 
-      {/* Mobile Sidebar Drawer Panel (Sharp Corners) */}
+      {/* Mobile Sidebar Drawer Panel */}
       <div className={`boutique-sidebar ${isOpen ? 'open' : ''}`}>
         {/* Header Bar using Consistent Vivisha Purple (#A049A3) */}
         <div className="sidebar-header">
@@ -61,31 +108,91 @@ const Sidebar = ({ isOpen, onClose }) => {
           )}
         </div>
 
-        {/* Navigation List — Site navigation only */}
+        {/* Navigation List — Site navigation */}
         <div className="sidebar-menu-body">
           <div className="sidebar-nav-list">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive =
+                !item.hasArrow &&
+                (item.path.includes('?')
+                  ? location.pathname + location.search === item.path
+                  : location.pathname === item.path && !location.search);
+
+              if (item.hasArrow) {
+                return (
+                  <React.Fragment key={item.id}>
+                    <button
+                      type="button"
+                      className={`sidebar-nav-item-row has-submenu ${isCategoriesExpanded ? 'expanded' : ''}`}
+                      onClick={toggleCategories}
+                      aria-expanded={isCategoriesExpanded}
+                      aria-label="Categories menu"
+                    >
+                      <span className="sidebar-nav-text">{item.label}</span>
+                      <span className={`sidebar-nav-arrow ${isCategoriesExpanded ? 'expanded' : ''}`}>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="sidebar-arrow-icon"
+                        >
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </button>
+
+                    {/* Categories Submenu Dropdown */}
+                    {isCategoriesExpanded && (
+                      <div className="sidebar-categories-dropdown">
+                        <Link
+                          to="/collections"
+                          onClick={onClose}
+                          className={`sidebar-category-subitem ${location.pathname === '/collections' && !location.search ? 'active' : ''}`}
+                        >
+                          <span className="category-subtext">All Categories</span>
+                        </Link>
+
+                        {categories.map((cat) => {
+                          const isCatActive =
+                            location.pathname === '/collections' &&
+                            location.search === `?category_id=${cat.id}`;
+
+                          return (
+                            <Link
+                              key={`cat-${cat.id}`}
+                              to={`/collections?category_id=${cat.id}`}
+                              onClick={onClose}
+                              className={`sidebar-category-subitem ${isCatActive ? 'active' : ''}`}
+                            >
+                              <span className="category-subtext">{cat.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              }
+
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={onClose}
-                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <span className="sidebar-nav-text">{item.label}</span>
-                  {item.hasArrow && (
-                    <span className="sidebar-nav-arrow">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                      </svg>
-                    </span>
-                  )}
-                </Link>
+                <div key={item.id} className={`sidebar-nav-item-row ${isActive ? 'active' : ''}`}>
+                  <Link
+                    to={item.path}
+                    onClick={onClose}
+                    className="sidebar-nav-item-link"
+                  >
+                    <span className="sidebar-nav-text">{item.label}</span>
+                  </Link>
+                </div>
               );
             })}
 
-            {/* Login / Register or Logout placed cleanly in menu list */}
+            {/* Login / Register or Logout */}
             {isAuthenticated ? (
               <button onClick={handleLogout} className="sidebar-nav-item auth-item logout-link">
                 <span className="auth-icon">

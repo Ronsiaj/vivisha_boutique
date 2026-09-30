@@ -2,6 +2,7 @@ import React from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import MobileBottomNav from '../components/MobileBottomNav';
+import EligibleCouponNotification from '../components/EligibleCouponNotification';
 import { Outlet } from 'react-router-dom';
 
 const PublicLayout = ({ children }) => {
@@ -11,6 +12,7 @@ const PublicLayout = ({ children }) => {
       <main className="main-content">
         {children || <Outlet />}
       </main>
+      <EligibleCouponNotification />
       <Footer />
       <MobileBottomNav />
     </div>
@@ -18,3 +20,4 @@ const PublicLayout = ({ children }) => {
 };
 
 export default PublicLayout;
+

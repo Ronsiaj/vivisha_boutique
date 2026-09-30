@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../../../assets/images/boutique_logo.png';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+
 const ForgotPassword = () => {
   const navigate = useNavigate();
   
@@ -49,7 +51,7 @@ const ForgotPassword = () => {
     setError('');
     
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/forget_password/forget.php', {
+      const response = await fetch(`${API_BASE_URL}/forget_password/forget.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: trimmedEmail })
@@ -88,7 +90,7 @@ const ForgotPassword = () => {
     setError('');
     
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/forget_password/verify.php', {
+      const response = await fetch(`${API_BASE_URL}/forget_password/verify.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,7 +165,7 @@ const ForgotPassword = () => {
     setError('');
     
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/forget_password/reset.php', {
+      const response = await fetch(`${API_BASE_URL}/forget_password/reset.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

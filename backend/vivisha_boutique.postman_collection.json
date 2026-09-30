@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "5a2a1fab-354d-4143-97ae-161aec8ada97",
+    "_postman_id": "3c3766f4-581b-4427-8c86-2dd4e821a3ac",
     "name": "vivisha_boutique",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "57410489",
-    "_collection_link": "https://go.postman.co/collection/57410489-5a2a1fab-354d-4143-97ae-161aec8ada97?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/57410489-3c3766f4-581b-4427-8c86-2dd4e821a3ac?source=collection_link"
   },
   "item": [
     {
@@ -17,7 +17,10 @@
               "name": "admin_register.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -25,15 +28,40 @@
               "name": "user_register.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
             {
               "name": "login.php",
               "request": {
-                "method": "GET",
-                "header": []
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"email\": \"admin@gmail.com\",\r\n    \"password\":\"Admin@123\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost/vivisha_boutique/api/auth/login.php",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "path": [
+                    "vivisha_boutique",
+                    "api",
+                    "auth",
+                    "login.php"
+                  ]
+                }
               },
               "response": []
             },
@@ -41,7 +69,21 @@
               "name": "logout.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "refresh.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -54,7 +96,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -62,7 +107,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -70,7 +118,21 @@
               "name": "status_update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "update.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -83,7 +145,10 @@
               "name": "create.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -91,7 +156,10 @@
               "name": "select_address.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -99,7 +167,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -107,7 +178,10 @@
               "name": "update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -115,7 +189,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -128,7 +205,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -141,7 +221,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -149,7 +232,10 @@
               "name": "create.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -157,7 +243,10 @@
               "name": "update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -170,7 +259,10 @@
               "name": "create.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -178,7 +270,10 @@
               "name": "update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -186,7 +281,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -194,7 +292,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -207,7 +308,10 @@
               "name": "create.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -215,7 +319,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -223,7 +330,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -231,7 +341,10 @@
               "name": "update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -244,7 +357,10 @@
               "name": "create.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -252,7 +368,10 @@
               "name": "update.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -260,7 +379,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -268,7 +390,37 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": "http://localhost/vivisha_boutique/api/varient/view.php?id=3",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "path": [
+                    "vivisha_boutique",
+                    "api",
+                    "varient",
+                    "view.php"
+                  ],
+                  "query": [
+                    {
+                      "key": "id",
+                      "value": "3"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "set_primary_image.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -281,7 +433,10 @@
               "name": "add.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -289,7 +444,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -297,7 +455,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -305,7 +466,32 @@
               "name": "remove.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "move_to.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "quantity_update.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -318,7 +504,10 @@
               "name": "add.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -326,7 +515,10 @@
               "name": "list.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -334,7 +526,10 @@
               "name": "remove.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -342,7 +537,10 @@
               "name": "view.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             }
@@ -355,7 +553,10 @@
               "name": "forget.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -363,7 +564,10 @@
               "name": "verify.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
               },
               "response": []
             },
@@ -371,13 +575,467 @@
               "name": "reset.php",
               "request": {
                 "method": "GET",
-                "header": []
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "coupons",
+          "item": [
+            {
+              "name": "birthday",
+              "item": [
+                {
+                  "name": "create.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "update.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "list.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "view.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "festival",
+              "item": [
+                {
+                  "name": "create.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "update.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "list.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "view.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "first_order",
+              "item": [
+                {
+                  "name": "create.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "update.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "list.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "view.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "referral",
+              "item": [
+                {
+                  "name": "create.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "update.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "list.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "view.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "first_order_user",
+              "item": [
+                {
+                  "name": "display_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "add_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "birthday_user",
+              "item": [
+                {
+                  "name": "display_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "add_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "festival_user",
+              "item": [
+                {
+                  "name": "display_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "add_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "referral_user",
+              "item": [
+                {
+                  "name": "add_coupon.php",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": ""
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hsn",
+          "item": [
+            {
+              "name": "create.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "list.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "view.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "update.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "orders",
+          "item": [
+            {
+              "name": "select_address.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "address_list.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "create.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "list.php",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "view.php",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{json_web_token_0wi5}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost/vivisha_boutique/api/orders/view.php?id=7",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "path": [
+                    "vivisha_boutique",
+                    "api",
+                    "orders",
+                    "view.php"
+                  ],
+                  "query": [
+                    {
+                      "key": "id",
+                      "value": "7"
+                    }
+                  ]
+                }
               },
               "response": []
             }
           ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "json_web_token_0exo",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_0tw4",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_0utr",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_0wi5",
+      "secret": true
     }
   ]
 }

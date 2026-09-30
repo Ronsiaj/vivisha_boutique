@@ -3,25 +3,33 @@ import { store } from '../store';
 import { logoutSuccess } from '../store/authslice';
 
 // Predefined Base URL (can be read from environment variables)
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.ammachi.com/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
     timeout: 15000,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
     },
 });
 
-// Request Interceptor: Inject token automatically from Redux state
+// Request Interceptor: Inject token automatically from Redux state or namespaced localStorage
 apiClient.interceptors.request.use(
     (config) => {
-        const state = store.getState();
-        const token = state.auth?.token || localStorage.getItem('token');
+        if (!config.headers.Authorization) {
+            const isAdminRequest = config.accountType === 'admin' || 
+                config.headers?.['X-Account-Type'] === 'admin' || 
+                (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+            
+            const adminToken = localStorage.getItem('vivisha_admin_token');
+            const customerToken = localStorage.getItem('vivisha_user_token');
+            const token = isAdminRequest ? adminToken : customerToken;
 
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
         return config;
     },
@@ -48,13 +56,19 @@ apiClient.interceptors.response.use(
             error: error.response?.data?.message || error.message || 'Something went wrong',
         };
 
-        // Auto logout if token is expired or unauthorized (401)
+        // Clear stale credentials if unauthorized (401)
         if (customError.status === 401) {
-            store.dispatch(logoutSuccess());
-            localStorage.removeItem('token');
-            // Redirect to login if browser context is available
-            if (typeof window !== 'undefined') {
-                window.location.href = '/login';
+            const isAdmin = error.config?.accountType === 'admin' || 
+                error.config?.headers?.['X-Account-Type'] === 'admin' || 
+                (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+
+            if (isAdmin) {
+                localStorage.removeItem('vivisha_admin_user');
+                localStorage.removeItem('vivisha_admin_token');
+            } else {
+                store.dispatch(logoutSuccess());
+                localStorage.removeItem('vivisha_user_user');
+                localStorage.removeItem('vivisha_user_token');
             }
         }
 

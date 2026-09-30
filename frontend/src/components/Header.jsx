@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import AnnouncementBar from './AnnouncementBar';
 import logo from '../../assets/images/boutique_logo.png';
 import banner1 from '../../assets/images/banner1.png';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { groupVariantsByProduct, formatImageUrl } from '../utils/productGrouping.js';
 
-const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
-const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+const ASSET_BASE_URL = import.meta.env.VITE_ASSET_BASE_URL || 'http://localhost/vivisha_boutique/backend/';
 
 const Header = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -22,6 +24,41 @@ const Header = () => {
   const [matchingProducts, setMatchingProducts] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Group matching products and prioritize the exact variant that matched the SKU/query
+  const processedMatchingProducts = React.useMemo(() => {
+    if (!matchingProducts || matchingProducts.length === 0) return [];
+
+    const queryLower = searchQuery.trim().toLowerCase();
+    const grouped = groupVariantsByProduct(matchingProducts);
+
+    return grouped.map((group) => {
+      // Find if a specific variant in this group matched the SKU or name
+      const matchingVariant = group.variants.find((v) => {
+        const skuMatch = v.sku && v.sku.toLowerCase().includes(queryLower);
+        const nameMatch = v.variant_name && v.variant_name.toLowerCase().includes(queryLower);
+        return skuMatch || nameMatch;
+      });
+
+      const targetVariant = matchingVariant || group.defaultVariant || group.variants[0] || {};
+      const targetSku = targetVariant.sku || group.variants.find((v) => v.sku)?.sku || '';
+
+      const sellPrice = parseFloat(targetVariant.pricing?.selling_price || group.minSellingPrice || 0);
+      const origPrice = parseFloat(targetVariant.pricing?.original_price || group.minOriginalPrice || 0);
+      const hasDiscount = origPrice > sellPrice;
+      const discountPercent = hasDiscount && origPrice > 0 ? Math.round(((origPrice - sellPrice) / origPrice) * 100) : 0;
+
+      return {
+        ...group,
+        targetVariant,
+        targetSku,
+        sellPrice,
+        origPrice,
+        hasDiscount,
+        discountPercent
+      };
+    });
+  }, [matchingProducts, searchQuery]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,6 +92,11 @@ const Header = () => {
     setIsAccountDropdownOpen(false);
     setIsSearchOpen(false);
   }, [location.pathname]);
+
+  // Fetch active categories on mount for navigation and suggestions
+  useEffect(() => {
+    fetchActiveCategories();
+  }, []);
 
   // Fetch active categories for suggestions
   const fetchActiveCategories = async () => {
@@ -134,10 +176,10 @@ const Header = () => {
     );
     setMatchingCategories(matchedCats);
 
-    // Debounce product variants API call
+    // Debounce product variants API call (supports SKU, product name, category, etc.)
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/varient/list.php?q=${encodeURIComponent(trimmed)}&limit=8`);
+        const res = await fetch(`${API_BASE_URL}/varient/list.php?q=${encodeURIComponent(trimmed)}&limit=12`);
         const data = await res.json();
         if (data.status && data.data && data.data.variants) {
           setMatchingProducts(data.data.variants);
@@ -229,6 +271,7 @@ const Header = () => {
 
   return (
     <>
+      <AnnouncementBar />
       <header className="boutique-header">
         <div className="header-left">
           <button
@@ -257,7 +300,6 @@ const Header = () => {
         <nav className="header-desktop-nav desktop-only">
           <Link to="/" className={isNavActive('/') ? 'active' : ''}>HOME</Link>
           <Link to="/collections" className={isNavActive('/collections') ? 'active' : ''}>SHOP NOW</Link>
-          <Link to="/notifications" className={isNavActive('/notifications') ? 'active' : ''}>NOTIFICATIONS</Link>
           <Link to="/about" className={isNavActive('/about') ? 'active' : ''}>ABOUT US</Link>
           <Link to="/contact" className={isNavActive('/contact') ? 'active' : ''}>CONTACT US</Link>
         </nav>
@@ -318,6 +360,15 @@ const Header = () => {
                       <path d="M16 10a4 4 0 0 1-8 0"></path>
                     </svg>
                     <span>My Orders</span>
+                  </Link>
+                  <Link to="/track-order" className="account-dropdown-item">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="1" y="3" width="15" height="13"></rect>
+                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                      <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                      <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    <span>Track Order</span>
                   </Link>
                   <Link to="/wishlist" className="account-dropdown-item">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -390,14 +441,6 @@ const Header = () => {
                   placeholder="Search categories, products (e.g. Kurti, Sarees)..."
                   aria-label="Search"
                 />
-                {searchQuery.length > 0 && (
-                  <button type="button" className="search-clear-btn" onClick={handleClearSearch} aria-label="Clear input">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                )}
                 <button type="button" className="search-close-btn" onClick={handleCloseSearch} aria-label="Close search">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -406,192 +449,122 @@ const Header = () => {
                 </button>
               </form>
 
-              {/* Suggestions Dropdown Content */}
-              <div className="search-dropdown-content">
-                {/* Default State: When user hasn't typed anything */}
-                {!searchQuery.trim() && (
-                  <div className="trending-searches">
-                    <div className="search-section-header">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                      </svg>
-                      <h4>Explore Categories</h4>
+              {/* Suggestions Dropdown Content (Single Vertical Panel, Only when typing) */}
+              {searchQuery.trim().length > 0 && (
+                <div className="search-dropdown-content">
+                  {/* Searching Loader */}
+                  {isSearching && (
+                    <div className="search-loading-state">
+                      <div className="search-spinner"></div>
+                      <span>Searching...</span>
                     </div>
-                    <div className="trending-tags">
-                      {categories.map((cat) => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          className="trending-tag"
-                          onClick={() => handleCategoryClick(cat.id)}
-                        >
-                          {cat.name}
-                        </button>
-                      ))}
+                  )}
+
+                  {/* No Results Found State */}
+                  {!isSearching && hasSearched && matchingCategories.length === 0 && processedMatchingProducts.length === 0 && (
+                    <div className="search-no-results">
+                      <p className="no-results-title">No results found for "{searchQuery}"</p>
+                      <span className="no-results-hint">Try checking your spelling or searching by another keyword or SKU.</span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* User is typing */}
-                {searchQuery.trim() && (
-                  <>
-                    {/* Searching Loader */}
-                    {isSearching && (
-                      <div className="search-loading-state">
-                        <div className="search-spinner"></div>
-                        <span>Searching products & categories...</span>
-                      </div>
-                    )}
-
-                    {/* No Results Found State */}
-                    {!isSearching && hasSearched && matchingCategories.length === 0 && matchingProducts.length === 0 && (
-                      <div className="search-no-results">
-                        <div className="no-results-icon">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            <line x1="8" y1="11" x2="14" y2="11"></line>
-                          </svg>
-                        </div>
-                        <h5>No results found for "{searchQuery}"</h5>
-                        <p>We couldn't find any products or categories matching your search.</p>
-                        {categories.length > 0 && (
-                          <div className="search-no-results-suggestions">
-                            <span>Browse available categories:</span>
-                            <div className="trending-tags">
-                              {categories.map((cat) => (
-                                <button
-                                  key={cat.id}
-                                  type="button"
-                                  className="trending-tag"
-                                  onClick={() => handleCategoryClick(cat.id)}
-                                >
-                                  {cat.name}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Search Matches: Categories & Products Separately */}
-                    {!isSearching && (matchingCategories.length > 0 || matchingProducts.length > 0) && (
-                      <div className="search-results-grid">
-                        {/* Matching Categories */}
-                        {matchingCategories.length > 0 && (
-                          <div className="search-category-section">
-                            <div className="search-section-header">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                              </svg>
-                              <h4>Categories ({matchingCategories.length})</h4>
-                            </div>
-                            <div className="search-category-list">
-                              {matchingCategories.map((cat) => (
-                                <div
-                                  key={cat.id}
-                                  className="search-category-card"
-                                  onClick={() => handleCategoryClick(cat.id)}
-                                >
-                                  <div className="category-card-text">
-                                    <span className="category-card-name">{cat.name}</span>
-                                    {cat.description && (
-                                      <span className="category-card-desc">{cat.description}</span>
-                                    )}
-                                  </div>
-                                  <span className="category-card-arrow">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                  </span>
+                  {/* Search Matches: Single Vertical Autocomplete Layout */}
+                  {!isSearching && (matchingCategories.length > 0 || processedMatchingProducts.length > 0) && (
+                    <div className="search-vertical-results">
+                      {/* 1. Matching Categories */}
+                      {matchingCategories.length > 0 && (
+                        <div className="search-group-section">
+                          <span className="search-group-heading">Categories</span>
+                          <div className="search-category-list">
+                            {matchingCategories.slice(0, 3).map((cat) => (
+                              <div
+                                key={cat.id}
+                                className="search-category-row"
+                                onClick={() => handleCategoryClick(cat.id)}
+                              >
+                                <div className="search-category-info">
+                                  <span className="search-category-title">{cat.name}</span>
+                                  {cat.description && (
+                                    <span className="search-category-subtitle">{cat.description}</span>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
+                                <svg className="search-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                              </div>
+                            ))}
                           </div>
-                        )}
+                        </div>
+                      )}
 
-                        {/* Matching Products */}
-                        {matchingProducts.length > 0 && (
-                          <div className="search-product-section">
-                            <div className="search-section-header">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2">
-                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                                <line x1="3" y1="6" x2="21" y2="6"></line>
-                                <path d="M16 10a4 4 0 0 1-8 0"></path>
-                              </svg>
-                              <h4>Products ({matchingProducts.length})</h4>
-                            </div>
-                            <div className="search-product-list">
-                              {matchingProducts.map((variant) => {
-                                const imgUrl = getProductImageUrl(variant);
-                                const sellPrice = parseFloat(variant.pricing?.selling_price || 0);
-                                const origPrice = parseFloat(variant.pricing?.original_price || 0);
-                                const hasDiscount = origPrice > sellPrice;
-                                const discountPercent = hasDiscount
-                                  ? Math.round(((origPrice - sellPrice) / origPrice) * 100)
-                                  : 0;
+                      {/* 2. Matching Products */}
+                      {processedMatchingProducts.length > 0 && (
+                        <div className="search-group-section">
+                          <span className="search-group-heading">Products</span>
+                          <div className="search-product-list">
+                            {processedMatchingProducts.slice(0, 6).map((product) => {
+                              const imgUrl = formatImageUrl(
+                                product.targetVariant?.primary_image || product.primaryImageUrl,
+                                banner1
+                              );
 
-                                return (
-                                  <div
-                                    key={variant.id}
-                                    className="search-product-card"
-                                    onClick={() => handleProductClick(variant.id)}
-                                  >
-                                    <div className="search-product-img-wrap">
-                                      <img src={imgUrl} alt={variant.product?.name || 'Product'} />
-                                    </div>
-                                    <div className="search-product-info">
-                                      {variant.category?.name && (
-                                        <span className="search-product-category">{variant.category.name}</span>
+                              return (
+                                <div
+                                  key={product.id || product.targetVariant?.id}
+                                  className="search-product-row"
+                                  onClick={() => handleProductClick(product.targetVariant?.id || product.id)}
+                                >
+                                  <div className="search-product-image">
+                                    <img
+                                      src={imgUrl}
+                                      alt={product.name || 'Product'}
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = banner1;
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="search-product-details">
+                                    <span className="search-product-title">{product.name}</span>
+                                    {product.targetSku && (
+                                      <span className="search-product-sku">SKU: {product.targetSku}</span>
+                                    )}
+                                    <div className="search-product-price-wrapper">
+                                      <span className="search-price-current">
+                                        ₹{product.sellPrice.toLocaleString('en-IN')}
+                                      </span>
+                                      {product.hasDiscount && (
+                                        <>
+                                          <span className="search-price-original">₹{product.origPrice.toLocaleString('en-IN')}</span>
+                                          <span className="search-price-discount">{product.discountPercent}% OFF</span>
+                                        </>
                                       )}
-                                      <h5 className="search-product-name">
-                                        {variant.product?.name}
-                                        {variant.variant_name ? ` - ${variant.variant_name}` : ''}
-                                      </h5>
-                                      <div className="search-product-price-row">
-                                        <span className="search-selling-price">₹{sellPrice.toLocaleString('en-IN')}</span>
-                                        {hasDiscount && (
-                                          <>
-                                            <span className="search-original-price">₹{origPrice.toLocaleString('en-IN')}</span>
-                                            <span className="search-discount-badge">{discountPercent}% OFF</span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="search-product-arrow">
-                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                      </svg>
                                     </div>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  <svg className="search-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                  </svg>
+                                </div>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      )}
 
-                    {/* View all in Shop button */}
-                    {!isSearching && (matchingCategories.length > 0 || matchingProducts.length > 0) && (
-                      <div className="search-view-all-wrapper">
+                      {/* View all in Shop option */}
+                      <div className="search-dropdown-footer">
                         <button
                           type="button"
-                          className="btn-view-all-search"
+                          className="search-view-all-link"
                           onClick={handleSearchSubmit}
                         >
-                          <span>View all search results in Shop</span>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                          </svg>
+                          View all results for "{searchQuery}" &rarr;
                         </button>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -600,6 +573,7 @@ const Header = () => {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        initialCategories={categories}
       />
     </>
   );

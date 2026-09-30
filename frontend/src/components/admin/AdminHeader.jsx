@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { useAdminAuth } from '../../context/AuthContext.jsx';
 
 const routeTitleMap = {
   '/admin/dashboard': 'Dashboard',
@@ -19,6 +20,7 @@ const routeTitleMap = {
 
 const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) => {
   const location = useLocation();
+  const { user } = useAdminAuth();
   const currentTitle = routeTitleMap[location.pathname] || 'Admin Panel';
 
   return (
@@ -51,8 +53,6 @@ const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) =>
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-
-        {/* <h2 className="admin-header-page-title">{currentTitle}</h2> */}
       </div>
 
       <div className="admin-header-right">
@@ -90,8 +90,8 @@ const AdminHeader = ({ onToggleSidebar, onToggleMobileSidebar, isCollapsed }) =>
             </svg>
           </div>
           <div className="admin-user-info">
-            <span className="user-name">Vivisha Admin</span>
-            <span className="user-role">Super Admin</span>
+            <span className="user-name">{user?.name || 'Vivisha Admin'}</span>
+            <span className="user-role">{user?.role === 'admin' ? 'Administrator' : 'Staff'}</span>
           </div>
         </div>
       </div>

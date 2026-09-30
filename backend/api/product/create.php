@@ -60,8 +60,8 @@ if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
 
 $allowedFields = [
     'category_id',
+    'hsn_profile_id',
     'name',
-    'slug',
     'description',
     'is_new_arrival',
     'is_featured',
@@ -78,8 +78,8 @@ foreach (array_keys($data) as $field) {
 }
 
 $categoryIdInput = $data['category_id'] ?? null;
+$hsnProfileIdInput = $data['hsn_profile_id'] ?? null;
 $name = isset($data['name']) ? trim((string)$data['name']) : '';
-$slugInput = isset($data['slug']) ? trim((string)$data['slug']) : '';
 $description = isset($data['description']) ? trim((string)$data['description']) : '';
 $isNewArrivalInput = $data['is_new_arrival'] ?? 0;
 $isFeaturedInput = $data['is_featured'] ?? 0;
@@ -101,6 +101,19 @@ if (
 
 $categoryId = (int)$categoryIdInput;
 
+if ($hsnProfileIdInput === null || $hsnProfileIdInput === '') {
+    sendResponse(false, 'hsn_profile_id is required.', null, 422);
+}
+
+if (
+    filter_var($hsnProfileIdInput, FILTER_VALIDATE_INT) === false ||
+    (int)$hsnProfileIdInput <= 0
+) {
+    sendResponse(false, 'hsn_profile_id must be a valid positive integer.', null, 422);
+}
+
+$hsnProfileId = (int)$hsnProfileIdInput;
+
 if ($name === '') {
     sendResponse(false, 'Product name is required.', null, 422);
 }
@@ -119,39 +132,6 @@ if (!preg_match('/^[\p{L}\p{N}\s\-\&\'\/().,+]+$/u', $name)) {
 
 if ($description !== '' && mb_strlen($description) > 10000) {
     sendResponse(false, 'Description must not exceed 10000 characters.', null, 422);
-}
-
-function createProductSlug(string $value): string
-{
-    $value = trim($value);
-
-    if (function_exists('transliterator_transliterate')) {
-        $converted = transliterator_transliterate(
-            'Any-Latin; Latin-ASCII;',
-            $value
-        );
-
-        if ($converted !== false) {
-            $value = $converted;
-        }
-    }
-
-    $value = strtolower($value);
-    $value = preg_replace('/[^a-z0-9]+/', '-', $value);
-
-    return trim((string)$value, '-');
-}
-
-$slug = $slugInput !== ''
-    ? createProductSlug($slugInput)
-    : createProductSlug($name);
-
-if ($slug === '') {
-    sendResponse(false, 'Unable to generate a valid product slug.', null, 422);
-}
-
-if (mb_strlen($slug) > 220) {
-    sendResponse(false, 'Slug must not exceed 220 characters.', null, 422);
 }
 
 function parseProductBoolean(mixed $value, string $field): int
@@ -230,6 +210,39 @@ try {
         sendResponse(false, 'Selected category is inactive.', null, 422);
     }
 
+    $hsnStmt = $pdo->prepare(
+        "SELECT
+            id,
+            category_id,
+            name,
+            hsn_code,
+            status
+         FROM hsn_profiles
+         WHERE id = :id
+         LIMIT 1"
+    );
+
+    $hsnStmt->bindValue(':id', $hsnProfileId, PDO::PARAM_INT);
+    $hsnStmt->execute();
+
+    $hsnProfile = $hsnStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$hsnProfile) {
+        sendResponse(false, 'HSN profile not found.', null, 404);
+    }
+
+    if ($hsnProfile['status'] !== 'active') {
+        sendResponse(false, 'Selected HSN profile is inactive.', null, 422);
+    }
+
+    if ((int)$hsnProfile['category_id'] !== $categoryId) {
+        sendResponse(false, 'Selected HSN profile does not belong to the selected category.', [
+            'category_id' => $categoryId,
+            'hsn_profile_id' => $hsnProfileId,
+            'hsn_profile_category_id' => (int)$hsnProfile['category_id']
+        ], 422);
+    }
+
     $duplicateNameStmt = $pdo->prepare(
         "SELECT id
          FROM products
@@ -244,23 +257,14 @@ try {
         sendResponse(false, 'Product name already exists.', null, 409);
     }
 
-    $duplicateSlugStmt = $pdo->prepare(
-        "SELECT id
-         FROM products
-         WHERE slug = :slug
-         LIMIT 1"
-    );
+    $temporarySlug = 'tmp-' . bin2hex(random_bytes(16));
 
-    $duplicateSlugStmt->bindValue(':slug', $slug, PDO::PARAM_STR);
-    $duplicateSlugStmt->execute();
-
-    if ($duplicateSlugStmt->fetch()) {
-        sendResponse(false, 'Product slug already exists.', null, 409);
-    }
+    $pdo->beginTransaction();
 
     $stmt = $pdo->prepare(
         "INSERT INTO products (
             category_id,
+            hsn_profile_id,
             name,
             slug,
             description,
@@ -270,6 +274,7 @@ try {
             status
         ) VALUES (
             :category_id,
+            :hsn_profile_id,
             :name,
             :slug,
             :description,
@@ -281,8 +286,9 @@ try {
     );
 
     $stmt->bindValue(':category_id', $categoryId, PDO::PARAM_INT);
+    $stmt->bindValue(':hsn_profile_id', $hsnProfileId, PDO::PARAM_INT);
     $stmt->bindValue(':name', $name, PDO::PARAM_STR);
-    $stmt->bindValue(':slug', $slug, PDO::PARAM_STR);
+    $stmt->bindValue(':slug', $temporarySlug, PDO::PARAM_STR);
 
     if ($description === '') {
         $stmt->bindValue(':description', null, PDO::PARAM_NULL);
@@ -299,11 +305,61 @@ try {
 
     $productId = (int)$pdo->lastInsertId();
 
+  function generateSlug(string $name, int $productId): string
+{
+    $slug = strtolower(trim($name));
+    $slug = preg_replace('/[^a-z0-9]+/i', '-', $slug);
+    $slug = trim($slug, '-');
+
+    return $slug . '-' . $productId;
+}
+
+$slug = generateSlug($name, $productId);
+
+    if (mb_strlen($slug) > 220) {
+        $pdo->rollBack();
+        sendResponse(false, 'Generated product slug is too long.', null, 500);
+    }
+
+    $duplicateSlugStmt = $pdo->prepare(
+        "SELECT id
+         FROM products
+         WHERE slug = :slug
+           AND id != :id
+         LIMIT 1"
+    );
+
+    $duplicateSlugStmt->bindValue(':slug', $slug, PDO::PARAM_STR);
+    $duplicateSlugStmt->bindValue(':id', $productId, PDO::PARAM_INT);
+    $duplicateSlugStmt->execute();
+
+    if ($duplicateSlugStmt->fetch()) {
+        $pdo->rollBack();
+        sendResponse(false, 'Generated product slug already exists.', [
+            'slug' => $slug
+        ], 409);
+    }
+
+    $slugStmt = $pdo->prepare(
+        "UPDATE products
+         SET slug = :slug
+         WHERE id = :id"
+    );
+
+    $slugStmt->bindValue(':slug', $slug, PDO::PARAM_STR);
+    $slugStmt->bindValue(':id', $productId, PDO::PARAM_INT);
+    $slugStmt->execute();
+
+    $pdo->commit();
+
     $fetchStmt = $pdo->prepare(
         "SELECT
             p.id,
             p.category_id,
             c.name AS category_name,
+            p.hsn_profile_id,
+            hp.name AS hsn_profile_name,
+            hp.hsn_code,
             p.name,
             p.slug,
             p.description,
@@ -316,6 +372,8 @@ try {
          FROM products p
          INNER JOIN categories c
             ON c.id = p.category_id
+         INNER JOIN hsn_profiles hp
+            ON hp.id = p.hsn_profile_id
          WHERE p.id = :id
          LIMIT 1"
     );
@@ -339,6 +397,9 @@ try {
             'id' => (int)$product['id'],
             'category_id' => (int)$product['category_id'],
             'category_name' => $product['category_name'],
+            'hsn_profile_id' => (int)$product['hsn_profile_id'],
+            'hsn_profile_name' => $product['hsn_profile_name'],
+            'hsn_code' => $product['hsn_code'],
             'name' => $product['name'],
             'slug' => $product['slug'],
             'description' => $product['description'],
@@ -352,6 +413,10 @@ try {
     ], 201);
 
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
     sendResponse(
         false,
         'Unable to create product.',
@@ -362,6 +427,10 @@ try {
     );
 
 } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
     sendResponse(
         false,
         'An unexpected error occurred.',

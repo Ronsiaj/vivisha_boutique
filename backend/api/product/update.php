@@ -61,8 +61,8 @@ if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
 $allowedFields = [
     'id',
     'category_id',
+    'hsn_profile_id',
     'name',
-    'slug',
     'description',
     'is_new_arrival',
     'is_featured',
@@ -81,42 +81,27 @@ foreach (array_keys($data) as $field) {
 $idInput = $data['id'] ?? null;
 
 if ($idInput === null || $idInput === '') {
-    sendResponse(false, 'Product ID is required.', null, 422);
+    sendResponse(false, 'id is required.', null, 422);
 }
 
 if (
     filter_var($idInput, FILTER_VALIDATE_INT) === false ||
     (int)$idInput <= 0
 ) {
-    sendResponse(false, 'Product ID must be a valid positive integer.', null, 422);
+    sendResponse(false, 'id must be a valid positive integer.', null, 422);
 }
 
-$productId = (int)$idInput;
+$id = (int)$idInput;
 
-$hasCategoryId = array_key_exists('category_id', $data);
-$hasName = array_key_exists('name', $data);
-$hasSlug = array_key_exists('slug', $data);
-$hasDescription = array_key_exists('description', $data);
-$hasNewArrival = array_key_exists('is_new_arrival', $data);
-$hasFeatured = array_key_exists('is_featured', $data);
-$hasBestSeller = array_key_exists('is_best_seller', $data);
-$hasStatus = array_key_exists('status', $data);
+$updateData = $data;
+unset($updateData['id']);
 
-if (
-    !$hasCategoryId &&
-    !$hasName &&
-    !$hasSlug &&
-    !$hasDescription &&
-    !$hasNewArrival &&
-    !$hasFeatured &&
-    !$hasBestSeller &&
-    !$hasStatus
-) {
-    sendResponse(false, 'At least one field must be provided for update.', [
+if (count($updateData) === 0) {
+    sendResponse(false, 'At least one field is required for update.', [
         'updatable_fields' => [
             'category_id',
+            'hsn_profile_id',
             'name',
-            'slug',
             'description',
             'is_new_arrival',
             'is_featured',
@@ -126,28 +111,7 @@ if (
     ], 422);
 }
 
-function createProductSlug(string $value): string
-{
-    $value = trim($value);
-
-    if (function_exists('transliterator_transliterate')) {
-        $converted = transliterator_transliterate(
-            'Any-Latin; Latin-ASCII;',
-            $value
-        );
-
-        if ($converted !== false) {
-            $value = $converted;
-        }
-    }
-
-    $value = strtolower($value);
-    $value = preg_replace('/[^a-z0-9]+/', '-', $value);
-
-    return trim((string)$value, '-');
-}
-
-function parseProductBoolean(mixed $value, string $field): int
+function parseProductUpdateBoolean(mixed $value, string $field): int
 {
     if (is_bool($value)) {
         return $value ? 1 : 0;
@@ -160,51 +124,64 @@ function parseProductBoolean(mixed $value, string $field): int
     if (is_string($value)) {
         $value = strtolower(trim($value));
 
-        if (in_array($value, ['0', 'false'], true)) {
-            return 0;
-        }
-
         if (in_array($value, ['1', 'true'], true)) {
             return 1;
         }
+
+        if (in_array($value, ['0', 'false'], true)) {
+            return 0;
+        }
     }
 
-    sendResponse(
-        false,
-        "{$field} must be 0, 1, true or false.",
-        null,
-        422
-    );
-
+    sendResponse(false, "{$field} must be 0, 1, true or false.", null, 422);
     return 0;
 }
 
-$categoryId = null;
-$name = null;
-$slug = null;
-$description = null;
-$isNewArrival = null;
-$isFeatured = null;
-$isBestSeller = null;
-$status = null;
+$updates = [];
+$params = [];
 
-if ($hasCategoryId) {
+if (array_key_exists('category_id', $updateData)) {
+    $value = $updateData['category_id'];
+
+    if ($value === null || $value === '') {
+        sendResponse(false, 'category_id cannot be empty.', null, 422);
+    }
+
     if (
-        filter_var($data['category_id'], FILTER_VALIDATE_INT) === false ||
-        (int)$data['category_id'] <= 0
+        filter_var($value, FILTER_VALIDATE_INT) === false ||
+        (int)$value <= 0
     ) {
         sendResponse(false, 'category_id must be a valid positive integer.', null, 422);
     }
 
-    $categoryId = (int)$data['category_id'];
+    $params[':category_id'] = (int)$value;
+    $updates[] = 'category_id = :category_id';
 }
 
-if ($hasName) {
-    if (!is_string($data['name'])) {
-        sendResponse(false, 'Product name must be a string.', null, 422);
+if (array_key_exists('hsn_profile_id', $updateData)) {
+    $value = $updateData['hsn_profile_id'];
+
+    if ($value === null || $value === '') {
+        sendResponse(false, 'hsn_profile_id cannot be empty.', null, 422);
     }
 
-    $name = trim($data['name']);
+    if (
+        filter_var($value, FILTER_VALIDATE_INT) === false ||
+        (int)$value <= 0
+    ) {
+        sendResponse(false, 'hsn_profile_id must be a valid positive integer.', null, 422);
+    }
+
+    $params[':hsn_profile_id'] = (int)$value;
+    $updates[] = 'hsn_profile_id = :hsn_profile_id';
+}
+
+if (array_key_exists('name', $updateData)) {
+    if ($updateData['name'] === null) {
+        sendResponse(false, 'Product name cannot be null.', null, 422);
+    }
+
+    $name = trim((string)$updateData['name']);
 
     if ($name === '') {
         sendResponse(false, 'Product name cannot be empty.', null, 422);
@@ -221,72 +198,60 @@ if ($hasName) {
     if (!preg_match('/^[\p{L}\p{N}\s\-\&\'\/().,+]+$/u', $name)) {
         sendResponse(false, 'Product name contains invalid characters.', null, 422);
     }
+
+    $params[':name'] = $name;
+    $updates[] = 'name = :name';
 }
 
-if ($hasSlug) {
-    if (!is_string($data['slug'])) {
-        sendResponse(false, 'Slug must be a string.', null, 422);
+if (array_key_exists('description', $updateData)) {
+    if ($updateData['description'] === null) {
+        $description = null;
+    } else {
+        $description = trim((string)$updateData['description']);
+        $description = $description === '' ? null : $description;
     }
-
-    $slugInput = trim($data['slug']);
-
-    if ($slugInput === '') {
-        sendResponse(false, 'Slug cannot be empty.', null, 422);
-    }
-
-    $slug = createProductSlug($slugInput);
-
-    if ($slug === '') {
-        sendResponse(false, 'Invalid product slug.', null, 422);
-    }
-
-    if (mb_strlen($slug) > 220) {
-        sendResponse(false, 'Slug must not exceed 220 characters.', null, 422);
-    }
-}
-
-if ($hasDescription) {
-    if ($data['description'] !== null && !is_string($data['description'])) {
-        sendResponse(false, 'Description must be a string or null.', null, 422);
-    }
-
-    $description = $data['description'] === null
-        ? null
-        : trim($data['description']);
 
     if ($description !== null && mb_strlen($description) > 10000) {
         sendResponse(false, 'Description must not exceed 10000 characters.', null, 422);
     }
+
+    $params[':description'] = $description;
+    $updates[] = 'description = :description';
 }
 
-if ($hasNewArrival) {
-    $isNewArrival = parseProductBoolean(
-        $data['is_new_arrival'],
+if (array_key_exists('is_new_arrival', $updateData)) {
+    $params[':is_new_arrival'] = parseProductUpdateBoolean(
+        $updateData['is_new_arrival'],
         'is_new_arrival'
     );
+
+    $updates[] = 'is_new_arrival = :is_new_arrival';
 }
 
-if ($hasFeatured) {
-    $isFeatured = parseProductBoolean(
-        $data['is_featured'],
+if (array_key_exists('is_featured', $updateData)) {
+    $params[':is_featured'] = parseProductUpdateBoolean(
+        $updateData['is_featured'],
         'is_featured'
     );
+
+    $updates[] = 'is_featured = :is_featured';
 }
 
-if ($hasBestSeller) {
-    $isBestSeller = parseProductBoolean(
-        $data['is_best_seller'],
+if (array_key_exists('is_best_seller', $updateData)) {
+    $params[':is_best_seller'] = parseProductUpdateBoolean(
+        $updateData['is_best_seller'],
         'is_best_seller'
     );
+
+    $updates[] = 'is_best_seller = :is_best_seller';
 }
 
-if ($hasStatus) {
-    if (!is_string($data['status'])) {
-        sendResponse(false, 'Status must be a string.', null, 422);
+if (array_key_exists('status', $updateData)) {
+    if ($updateData['status'] === null) {
+        sendResponse(false, 'status cannot be null.', null, 422);
     }
 
-    $status = strtolower(trim($data['status']));
-
+    $status = strtolower(trim((string)$updateData['status']));
     $allowedStatuses = ['active', 'inactive'];
 
     if (!in_array($status, $allowedStatuses, true)) {
@@ -294,216 +259,191 @@ if ($hasStatus) {
             'allowed_statuses' => $allowedStatuses
         ], 422);
     }
+
+    $params[':status'] = $status;
+    $updates[] = 'status = :status';
 }
 
 try {
-    $checkStmt = $pdo->prepare(
+    $existingStmt = $pdo->prepare(
         "SELECT
             id,
             category_id,
+            hsn_profile_id,
             name,
             slug,
             description,
             is_new_arrival,
             is_featured,
             is_best_seller,
-            status,
-            created_at,
-            updated_at
+            status
          FROM products
          WHERE id = :id
          LIMIT 1"
     );
 
-    $checkStmt->bindValue(':id', $productId, PDO::PARAM_INT);
-    $checkStmt->execute();
+    $existingStmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $existingStmt->execute();
 
-    $existingProduct = $checkStmt->fetch(PDO::FETCH_ASSOC);
+    $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$existingProduct) {
+    if (!$existing) {
         sendResponse(false, 'Product not found.', null, 404);
     }
 
-    if ($hasCategoryId) {
-        $categoryStmt = $pdo->prepare(
-            "SELECT id, name, status
-             FROM categories
-             WHERE id = :id
-             LIMIT 1"
+    $finalCategoryId = array_key_exists(':category_id', $params)
+        ? (int)$params[':category_id']
+        : (int)$existing['category_id'];
+
+    $finalHsnProfileId = array_key_exists(':hsn_profile_id', $params)
+        ? (int)$params[':hsn_profile_id']
+        : (
+            $existing['hsn_profile_id'] !== null
+                ? (int)$existing['hsn_profile_id']
+                : null
         );
 
-        $categoryStmt->bindValue(':id', $categoryId, PDO::PARAM_INT);
-        $categoryStmt->execute();
+    $finalName = array_key_exists(':name', $params)
+        ? (string)$params[':name']
+        : (string)$existing['name'];
 
-        $category = $categoryStmt->fetch(PDO::FETCH_ASSOC);
+    $categoryStmt = $pdo->prepare(
+        "SELECT id, name, status
+         FROM categories
+         WHERE id = :id
+         LIMIT 1"
+    );
 
-        if (!$category) {
-            sendResponse(false, 'Category not found.', null, 404);
-        }
+    $categoryStmt->bindValue(':id', $finalCategoryId, PDO::PARAM_INT);
+    $categoryStmt->execute();
 
-        if ($category['status'] !== 'active') {
-            sendResponse(false, 'Selected category is inactive.', null, 422);
-        }
+    $category = $categoryStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$category) {
+        sendResponse(false, 'Category not found.', null, 404);
     }
 
-    if ($hasName) {
-        $duplicateNameStmt = $pdo->prepare(
-            "SELECT id
-             FROM products
-             WHERE LOWER(name) = LOWER(:name)
-             AND id != :id
-             LIMIT 1"
-        );
-
-        $duplicateNameStmt->bindValue(':name', $name, PDO::PARAM_STR);
-        $duplicateNameStmt->bindValue(':id', $productId, PDO::PARAM_INT);
-        $duplicateNameStmt->execute();
-
-        if ($duplicateNameStmt->fetch()) {
-            sendResponse(false, 'Product name already exists.', null, 409);
-        }
+    if ($category['status'] !== 'active') {
+        sendResponse(false, 'Selected category is inactive.', [
+            'category_id' => $finalCategoryId,
+            'category_name' => $category['name']
+        ], 422);
     }
 
-    if ($hasSlug) {
-        $duplicateSlugStmt = $pdo->prepare(
-            "SELECT id
-             FROM products
-             WHERE slug = :slug
-             AND id != :id
-             LIMIT 1"
-        );
-
-        $duplicateSlugStmt->bindValue(':slug', $slug, PDO::PARAM_STR);
-        $duplicateSlugStmt->bindValue(':id', $productId, PDO::PARAM_INT);
-        $duplicateSlugStmt->execute();
-
-        if ($duplicateSlugStmt->fetch()) {
-            sendResponse(false, 'Product slug already exists.', null, 409);
-        }
+    if ($finalHsnProfileId === null) {
+        sendResponse(false, 'Product must have a valid hsn_profile_id.', null, 422);
     }
 
-    $updateFields = [];
-    $params = [
-        ':id' => $productId
-    ];
+    $hsnStmt = $pdo->prepare(
+        "SELECT
+            id,
+            category_id,
+            name,
+            hsn_code,
+            description,
+            status
+         FROM hsn_profiles
+         WHERE id = :id
+         LIMIT 1"
+    );
 
-    if ($hasCategoryId) {
-        $updateFields[] = 'category_id = :category_id';
-        $params[':category_id'] = $categoryId;
+    $hsnStmt->bindValue(':id', $finalHsnProfileId, PDO::PARAM_INT);
+    $hsnStmt->execute();
+
+    $hsnProfile = $hsnStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$hsnProfile) {
+        sendResponse(false, 'HSN profile not found.', null, 404);
     }
 
-    if ($hasName) {
-        $updateFields[] = 'name = :name';
-        $params[':name'] = $name;
-
-        if (!$hasSlug) {
-            $autoSlug = createProductSlug($name);
-
-            if ($autoSlug === '') {
-                sendResponse(false, 'Unable to generate slug from product name.', null, 422);
-            }
-
-            if (mb_strlen($autoSlug) > 220) {
-                sendResponse(false, 'Generated slug must not exceed 220 characters.', null, 422);
-            }
-
-            $duplicateAutoSlugStmt = $pdo->prepare(
-                "SELECT id
-                 FROM products
-                 WHERE slug = :slug
-                 AND id != :id
-                 LIMIT 1"
-            );
-
-            $duplicateAutoSlugStmt->bindValue(':slug', $autoSlug, PDO::PARAM_STR);
-            $duplicateAutoSlugStmt->bindValue(':id', $productId, PDO::PARAM_INT);
-            $duplicateAutoSlugStmt->execute();
-
-            if ($duplicateAutoSlugStmt->fetch()) {
-                sendResponse(false, 'Generated product slug already exists.', null, 409);
-            }
-
-            $updateFields[] = 'slug = :auto_slug';
-            $params[':auto_slug'] = $autoSlug;
-        }
+    if ($hsnProfile['status'] !== 'active') {
+        sendResponse(false, 'Selected HSN profile is inactive.', [
+            'hsn_profile_id' => $finalHsnProfileId,
+            'hsn_profile_name' => $hsnProfile['name']
+        ], 422);
     }
 
-    if ($hasSlug) {
-        $updateFields[] = 'slug = :slug';
-        $params[':slug'] = $slug;
+    if ((int)$hsnProfile['category_id'] !== $finalCategoryId) {
+        sendResponse(false, 'Selected HSN profile does not belong to the selected category.', [
+            'category_id' => $finalCategoryId,
+            'category_name' => $category['name'],
+            'hsn_profile_id' => $finalHsnProfileId,
+            'hsn_profile_name' => $hsnProfile['name']
+        ], 422);
     }
 
-    if ($hasDescription) {
-        $updateFields[] = 'description = :description';
+    $duplicateNameStmt = $pdo->prepare(
+        "SELECT id
+         FROM products
+         WHERE LOWER(name) = LOWER(:name)
+           AND id != :id
+         LIMIT 1"
+    );
 
-        $params[':description'] = (
-            $description === null ||
-            $description === ''
-        ) ? null : $description;
+    $duplicateNameStmt->bindValue(':name', $finalName, PDO::PARAM_STR);
+    $duplicateNameStmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $duplicateNameStmt->execute();
+
+    if ($duplicateNameStmt->fetch()) {
+        sendResponse(false, 'Product name already exists.', [
+            'name' => $finalName
+        ], 409);
     }
 
-    if ($hasNewArrival) {
-        $updateFields[] = 'is_new_arrival = :is_new_arrival';
-        $params[':is_new_arrival'] = $isNewArrival;
+    $duplicateSlugStmt = $pdo->prepare(
+        "SELECT id
+         FROM products
+         WHERE slug = :slug
+           AND id != :id
+         LIMIT 1"
+    );
+
+    $duplicateSlugStmt->bindValue(':slug', $existing['slug'], PDO::PARAM_STR);
+    $duplicateSlugStmt->bindValue(':id', $id, PDO::PARAM_INT);
+    $duplicateSlugStmt->execute();
+
+    if ($duplicateSlugStmt->fetch()) {
+        sendResponse(false, 'Product slug already exists.', [
+            'slug' => $existing['slug']
+        ], 409);
     }
 
-    if ($hasFeatured) {
-        $updateFields[] = 'is_featured = :is_featured';
-        $params[':is_featured'] = $isFeatured;
-    }
-
-    if ($hasBestSeller) {
-        $updateFields[] = 'is_best_seller = :is_best_seller';
-        $params[':is_best_seller'] = $isBestSeller;
-    }
-
-    if ($hasStatus) {
-        $updateFields[] = 'status = :status';
-        $params[':status'] = $status;
-    }
-
-    if (empty($updateFields)) {
-        sendResponse(false, 'No valid fields provided for update.', null, 422);
-    }
-
-    $pdo->beginTransaction();
-
-    $sql = "
-        UPDATE products
-        SET " . implode(', ', $updateFields) . "
-        WHERE id = :id
-    ";
-
-    $stmt = $pdo->prepare($sql);
+    $stmt = $pdo->prepare(
+        "UPDATE products
+         SET " . implode(', ', $updates) . "
+         WHERE id = :id"
+    );
 
     foreach ($params as $key => $value) {
-        if (
-            in_array(
-                $key,
-                [
-                    ':id',
-                    ':category_id',
-                    ':is_new_arrival',
-                    ':is_featured',
-                    ':is_best_seller'
-                ],
-                true
-            )
-        ) {
+        if (in_array($key, [
+            ':category_id',
+            ':hsn_profile_id',
+            ':is_new_arrival',
+            ':is_featured',
+            ':is_best_seller'
+        ], true)) {
             $stmt->bindValue($key, $value, PDO::PARAM_INT);
-        } elseif ($value === null) {
+        } elseif ($key === ':description' && $value === null) {
             $stmt->bindValue($key, null, PDO::PARAM_NULL);
         } else {
             $stmt->bindValue($key, $value, PDO::PARAM_STR);
         }
     }
 
+    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
     $stmt->execute();
 
     $fetchStmt = $pdo->prepare(
         "SELECT
             p.id,
             p.category_id,
+            c.name AS category_name,
+            c.status AS category_status,
+            p.hsn_profile_id,
+            hp.name AS hsn_profile_name,
+            hp.hsn_code,
+            hp.description AS hsn_description,
+            hp.status AS hsn_profile_status,
             p.name,
             p.slug,
             p.description,
@@ -512,37 +452,39 @@ try {
             p.is_best_seller,
             p.status,
             p.created_at,
-            p.updated_at,
-            c.name AS category_name,
-            c.slug AS category_slug,
-            c.status AS category_status
+            p.updated_at
          FROM products p
          INNER JOIN categories c
             ON c.id = p.category_id
+         LEFT JOIN hsn_profiles hp
+            ON hp.id = p.hsn_profile_id
          WHERE p.id = :id
          LIMIT 1"
     );
 
-    $fetchStmt->bindValue(':id', $productId, PDO::PARAM_INT);
+    $fetchStmt->bindValue(':id', $id, PDO::PARAM_INT);
     $fetchStmt->execute();
 
     $product = $fetchStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$product) {
-        throw new RuntimeException('Unable to retrieve updated product.');
+        sendResponse(false, 'Product updated but unable to retrieve product.', null, 500);
     }
-
-    $pdo->commit();
 
     sendResponse(true, 'Product updated successfully.', [
         'product' => [
             'id' => (int)$product['id'],
-            'category_id' => (int)$product['category_id'],
             'category' => [
                 'id' => (int)$product['category_id'],
                 'name' => $product['category_name'],
-                'slug' => $product['category_slug'],
                 'status' => $product['category_status']
+            ],
+            'hsn_profile' => [
+                'id' => (int)$product['hsn_profile_id'],
+                'name' => $product['hsn_profile_name'],
+                'hsn_code' => $product['hsn_code'],
+                'description' => $product['hsn_description'],
+                'status' => $product['hsn_profile_status']
             ],
             'name' => $product['name'],
             'slug' => $product['slug'],
@@ -554,13 +496,9 @@ try {
             'created_at' => $product['created_at'],
             'updated_at' => $product['updated_at']
         ]
-    ], 200);
+    ]);
 
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
     sendResponse(
         false,
         'Unable to update product.',
@@ -569,12 +507,7 @@ try {
             : null,
         500
     );
-
 } catch (Throwable $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
     sendResponse(
         false,
         'An unexpected error occurred.',

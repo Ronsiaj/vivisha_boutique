@@ -4,9 +4,10 @@ import collectionsBanner from '../../assets/images/collections_banner.png';
 import { useCart } from '../context/CartContext.jsx';
 import { useWishlist } from '../context/WishlistContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { groupVariantsByProduct } from '../utils/productGrouping.js';
 
-const API_BASE_URL = 'http://localhost/vivisha_boutique/backend/api';
-const ASSET_BASE_URL = 'http://localhost/vivisha_boutique/backend/';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+const ASSET_BASE_URL = import.meta.env.VITE_ASSET_BASE_URL || 'http://localhost/vivisha_boutique/backend/';
 
 const sortOptions = [
   { id: 'newest', label: 'Newest' },
@@ -75,8 +76,44 @@ const Collections = () => {
     return '';
   };
 
+  const getInitialTag = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tag = params.get('tag');
+      if (tag) return tag;
+      if (params.get('is_new_arrival') === '1') return 'new_arrival';
+      if (params.get('is_featured') === '1') return 'featured';
+      if (params.get('is_best_seller') === '1') return 'best_seller';
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const getVariantCardImages = (variant) => {
+    const primaryPath = variant.primary_image?.image;
+    const imageList = Array.isArray(variant.images)
+      ? variant.images.map((im) => (typeof im === 'string' ? im : im?.image)).filter(Boolean)
+      : [];
+
+    const defaultPath = primaryPath || imageList[0] || null;
+    const hoverPath = imageList.find((im) => im && im !== defaultPath) || null;
+
+    const format = (p) => {
+      if (!p) return '';
+      if (p.startsWith('http')) return p;
+      return `${ASSET_BASE_URL}${p}`;
+    };
+
+    return {
+      defaultUrl: format(defaultPath),
+      hoverUrl: format(hoverPath)
+    };
+  };
+
   // API State
   const [variants, setVariants] = useState([]);
+  const groupedProducts = React.useMemo(() => groupVariantsByProduct(variants), [variants]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [availableSizes, setAvailableSizes] = useState(defaultBackendSizes);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,8 +126,24 @@ const Collections = () => {
   // Active Applied Filters State
   const [selectedCategory, setSelectedCategory] = useState(getInitialCategoryId);
   const [selectedSizes, setSelectedSizes] = useState(getInitialSelectedSizes);
+  const [selectedTag, setSelectedTag] = useState(getInitialTag);
   const [inStockOnly, setInStockOnly] = useState(false);
-  const [maxPrice, setMaxPrice] = useState(3000);
+  
+  // Price Filter State
+  const [dynamicMaxPrice, setDynamicMaxPrice] = useState(null);
+  const [appliedMinPrice, setAppliedMinPrice] = useState(null);
+  const [appliedMaxPrice, setAppliedMaxPrice] = useState(null);
+  const [isPriceFilterActive, setIsPriceFilterActive] = useState(false);
+
+  // Local UI State for Desktop Price Slider & Inputs (Does NOT trigger API during active drag/typing)
+  const [uiMinPrice, setUiMinPrice] = useState(0);
+  const [uiMaxPrice, setUiMaxPrice] = useState(10000);
+  const [inputFromText, setInputFromText] = useState('0');
+  const [inputToText, setInputToText] = useState('10000');
+
+  // Debounce ref to prevent duplicate/continuous API requests
+  const priceDebounceTimerRef = useRef(null);
+
   const [sortBy, setSortBy] = useState('newest');
   const [searchKeyword, setSearchKeyword] = useState(getInitialSearchKeyword);
   
@@ -113,12 +166,10 @@ const Collections = () => {
   const [draftCategory, setDraftCategory] = useState(null);
   const [draftSizes, setDraftSizes] = useState([]);
   const [draftInStock, setDraftInStock] = useState(false);
-  const [draftMaxPrice, setDraftMaxPrice] = useState(3000);
-
-  // Scroll to top whenever the collections page mounts or query parameters change
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [location.pathname, location.search]);
+  const [draftMinPrice, setDraftMinPrice] = useState(0);
+  const [draftMaxPrice, setDraftMaxPrice] = useState(10000);
+  const [draftFromText, setDraftFromText] = useState('0');
+  const [draftToText, setDraftToText] = useState('10000');
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -161,7 +212,7 @@ const Collections = () => {
       // 2. Fetch all Sizes from backend Size API
       try {
         const headers = {};
-        const authToken = token || localStorage.getItem('vivisha_auth_token') || localStorage.getItem('token') || localStorage.getItem('admin_token');
+        const authToken = token || localStorage.getItem('vivisha_user_token');
         if (authToken) {
           headers['Authorization'] = `Bearer ${authToken}`;
         }
@@ -181,7 +232,7 @@ const Collections = () => {
     fetchInitialFilterData();
   }, [token]);
 
-  // Parse Category, Size & Search Query from URL Query Parameters
+  // Parse Category, Size, Tags & Search Query from URL Query Parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const catId = params.get('category_id') || params.get('cat');
@@ -199,6 +250,21 @@ const Collections = () => {
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => !isNaN(n));
       setSelectedSizes(parsedSizes);
+    } else {
+      setSelectedSizes([]);
+    }
+
+    const tag = params.get('tag');
+    if (tag) {
+      setSelectedTag(tag);
+    } else if (params.get('is_new_arrival') === '1') {
+      setSelectedTag('new_arrival');
+    } else if (params.get('is_featured') === '1') {
+      setSelectedTag('featured');
+    } else if (params.get('is_best_seller') === '1') {
+      setSelectedTag('best_seller');
+    } else {
+      setSelectedTag(null);
     }
 
     const q = params.get('q') || params.get('search');
@@ -206,7 +272,64 @@ const Collections = () => {
     setCurrentPage(1);
   }, [location.search]);
 
-  // Fetch Variants
+  // Dynamically fetch the highest available product price from API
+  useEffect(() => {
+    let isCurrent = true;
+    const fetchMaxPrice = async () => {
+      try {
+        const q = new URLSearchParams();
+        q.append('sort_by', 'selling_price');
+        q.append('sort_order', 'desc');
+        q.append('limit', 1);
+        if (selectedCategory) {
+          q.append('category_id', selectedCategory);
+        }
+        if (searchKeyword) {
+          q.append('q', searchKeyword);
+        }
+        const res = await fetch(`${API_BASE_URL}/varient/list.php?${q.toString()}`);
+        const data = await res.json();
+        if (isCurrent && data.status && data.data?.variants?.length > 0) {
+          const topPrice = parseFloat(data.data.variants[0].pricing?.selling_price);
+          if (!isNaN(topPrice) && topPrice > 0) {
+            const ceiling = Math.ceil(topPrice);
+            setDynamicMaxPrice(ceiling);
+            if (!isPriceFilterActive) {
+              setUiMaxPrice(ceiling);
+              setInputToText(String(ceiling));
+              setDraftMaxPrice(ceiling);
+              setDraftToText(String(ceiling));
+            }
+          }
+        } else if (isCurrent && selectedCategory) {
+          // If no variants under this category, fallback to overall store highest price
+          const fallbackRes = await fetch(`${API_BASE_URL}/varient/list.php?sort_by=selling_price&sort_order=desc&limit=1`);
+          const fallbackData = await fallbackRes.json();
+          if (isCurrent && fallbackData.status && fallbackData.data?.variants?.length > 0) {
+            const topPrice = parseFloat(fallbackData.data.variants[0].pricing?.selling_price);
+            if (!isNaN(topPrice) && topPrice > 0) {
+              const ceiling = Math.ceil(topPrice);
+              setDynamicMaxPrice(ceiling);
+              if (!isPriceFilterActive) {
+                setUiMaxPrice(ceiling);
+                setInputToText(String(ceiling));
+                setDraftMaxPrice(ceiling);
+                setDraftToText(String(ceiling));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch max price:', err);
+      }
+    };
+    fetchMaxPrice();
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedCategory, searchKeyword, isPriceFilterActive]);
+
+  // Fetch Variants (Only fires when filters are committed, NOT during continuous slider dragging)
   useEffect(() => {
     let isCurrent = true;
     const fetchVariants = async () => {
@@ -215,12 +338,24 @@ const Collections = () => {
         const query = new URLSearchParams();
         query.append('page', currentPage);
         query.append('limit', 12);
-        query.append('max_price', maxPrice);
+        
+        // Only apply price filter when committed
+        if (isPriceFilterActive) {
+          if (appliedMinPrice !== null && appliedMinPrice > 0) {
+            query.append('min_price', appliedMinPrice);
+          }
+          if (appliedMaxPrice !== null && appliedMaxPrice > 0) {
+            query.append('max_price', appliedMaxPrice);
+          }
+        }
         
         if (selectedCategory) query.append('category_id', selectedCategory);
         if (selectedSizes.length === 1) query.append('size_id', selectedSizes[0]);
         if (inStockOnly) query.append('stock_status', 'in_stock');
         if (searchKeyword) query.append('q', searchKeyword);
+        if (selectedTag === 'new_arrival') query.append('is_new_arrival', '1');
+        if (selectedTag === 'featured') query.append('is_featured', '1');
+        if (selectedTag === 'best_seller') query.append('is_best_seller', '1');
         
         if (sortBy === 'price-low') {
           query.append('sort_by', 'selling_price');
@@ -265,7 +400,7 @@ const Collections = () => {
     return () => {
       isCurrent = false;
     };
-  }, [currentPage, selectedCategory, selectedSizes, inStockOnly, maxPrice, sortBy, searchKeyword]);
+  }, [currentPage, selectedCategory, selectedSizes, selectedTag, inStockOnly, isPriceFilterActive, appliedMinPrice, appliedMaxPrice, sortBy, searchKeyword]);
 
   const toggleAccordion = (key) => {
     setOpenAccordions(prev => ({
@@ -365,19 +500,203 @@ const Collections = () => {
     }
   };
 
+  // Validates and commits price filter to trigger product API once
+  const commitPriceFilter = (fromVal, toVal) => {
+    let cleanMin = parseFloat(fromVal);
+    let cleanMax = parseFloat(toVal);
+
+    if (isNaN(cleanMin) || cleanMin < 0) cleanMin = 0;
+    if (isNaN(cleanMax) || cleanMax < 0) cleanMax = dynamicMaxPrice || 10000;
+
+    // Validate From <= To
+    if (cleanMin > cleanMax) {
+      cleanMin = cleanMax;
+    }
+
+    if (dynamicMaxPrice && cleanMax > dynamicMaxPrice) {
+      cleanMax = dynamicMaxPrice;
+    }
+
+    setUiMinPrice(cleanMin);
+    setUiMaxPrice(cleanMax);
+    setInputFromText(String(cleanMin));
+    setInputToText(String(cleanMax));
+
+    const isFullRange = cleanMin === 0 && (!dynamicMaxPrice || cleanMax >= dynamicMaxPrice);
+    if (isFullRange) {
+      setIsPriceFilterActive(false);
+      setAppliedMinPrice(null);
+      setAppliedMaxPrice(null);
+    } else {
+      setIsPriceFilterActive(true);
+      setAppliedMinPrice(cleanMin > 0 ? cleanMin : null);
+      setAppliedMaxPrice(cleanMax);
+    }
+    setCurrentPage(1);
+  };
+
+  // Desktop Slider change handler: updates UI immediately without firing API
+  const handleSliderChange = (e) => {
+    const val = Number(e.target.value);
+    setUiMaxPrice(val);
+    setInputToText(String(val));
+
+    // Debounce fallback in case pointerup is missed
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    priceDebounceTimerRef.current = setTimeout(() => {
+      commitPriceFilter(uiMinPrice, val);
+    }, 600);
+  };
+
+  // Desktop Slider release handler: commits filter immediately when user stops dragging
+  const handleSliderRelease = () => {
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    commitPriceFilter(uiMinPrice, uiMaxPrice);
+  };
+
+  // Desktop From Price input handlers
+  const handleFromInputChange = (e) => {
+    const text = e.target.value;
+    setInputFromText(text);
+
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    priceDebounceTimerRef.current = setTimeout(() => {
+      const num = parseFloat(text);
+      if (!isNaN(num)) {
+        commitPriceFilter(num, uiMaxPrice);
+      }
+    }, 750);
+  };
+
+  const handleFromInputCommit = () => {
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    const num = parseFloat(inputFromText);
+    commitPriceFilter(isNaN(num) ? 0 : num, uiMaxPrice);
+  };
+
+  // Desktop To Price input handlers
+  const handleToInputChange = (e) => {
+    const text = e.target.value;
+    setInputToText(text);
+
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    priceDebounceTimerRef.current = setTimeout(() => {
+      const num = parseFloat(text);
+      if (!isNaN(num)) {
+        commitPriceFilter(uiMinPrice, num);
+      }
+    }, 750);
+  };
+
+  const handleToInputCommit = () => {
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    const num = parseFloat(inputToText);
+    commitPriceFilter(uiMinPrice, isNaN(num) ? (dynamicMaxPrice || 10000) : num);
+  };
+
+  const handleResetPriceFilter = () => {
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
+    setIsPriceFilterActive(false);
+    setAppliedMinPrice(null);
+    setAppliedMaxPrice(null);
+    setUiMinPrice(0);
+    const maxVal = dynamicMaxPrice || 10000;
+    setUiMaxPrice(maxVal);
+    setInputFromText('0');
+    setInputToText(String(maxVal));
+    setDraftMinPrice(0);
+    setDraftMaxPrice(maxVal);
+    setDraftFromText('0');
+    setDraftToText(String(maxVal));
+    setCurrentPage(1);
+  };
+
   const openMobileDrawer = () => {
     setDraftCategory(selectedCategory);
     setDraftSizes(selectedSizes);
     setDraftInStock(inStockOnly);
-    setDraftMaxPrice(maxPrice);
+    const curMin = appliedMinPrice || 0;
+    const curMax = appliedMaxPrice || dynamicMaxPrice || 10000;
+    setDraftMinPrice(curMin);
+    setDraftMaxPrice(curMax);
+    setDraftFromText(String(curMin));
+    setDraftToText(String(curMax));
     setIsMobileDrawerOpen(true);
+  };
+
+  const handleMobileSliderChange = (e) => {
+    const val = Number(e.target.value);
+    setDraftMaxPrice(val);
+    setDraftToText(String(val));
+  };
+
+  const handleMobileFromInputChange = (e) => {
+    const val = e.target.value;
+    setDraftFromText(val);
+    const num = parseFloat(val);
+    if (!isNaN(num)) {
+      setDraftMinPrice(num);
+    }
+  };
+
+  const handleMobileToInputChange = (e) => {
+    const val = e.target.value;
+    setDraftToText(val);
+    const num = parseFloat(val);
+    if (!isNaN(num)) {
+      setDraftMaxPrice(num);
+    }
   };
 
   const applyMobileDrawer = () => {
     setSelectedCategory(draftCategory);
     setSelectedSizes(draftSizes);
     setInStockOnly(draftInStock);
-    setMaxPrice(draftMaxPrice);
+
+    let cleanMin = parseFloat(draftFromText);
+    let cleanMax = parseFloat(draftToText);
+
+    if (isNaN(cleanMin) || cleanMin < 0) cleanMin = 0;
+    if (isNaN(cleanMax) || cleanMax < 0) cleanMax = dynamicMaxPrice || 10000;
+
+    if (cleanMin > cleanMax) {
+      cleanMin = cleanMax;
+    }
+
+    if (dynamicMaxPrice && cleanMax > dynamicMaxPrice) {
+      cleanMax = dynamicMaxPrice;
+    }
+
+    setUiMinPrice(cleanMin);
+    setUiMaxPrice(cleanMax);
+    setInputFromText(String(cleanMin));
+    setInputToText(String(cleanMax));
+
+    const isFullRange = cleanMin === 0 && (!dynamicMaxPrice || cleanMax >= dynamicMaxPrice);
+    if (isFullRange) {
+      setIsPriceFilterActive(false);
+      setAppliedMinPrice(null);
+      setAppliedMaxPrice(null);
+    } else {
+      setIsPriceFilterActive(true);
+      setAppliedMinPrice(cleanMin > 0 ? cleanMin : null);
+      setAppliedMaxPrice(cleanMax);
+    }
+
     setCurrentPage(1);
     setIsMobileDrawerOpen(false);
     if (draftCategory) {
@@ -391,14 +710,32 @@ const Collections = () => {
     setDraftCategory(null);
     setDraftSizes([]);
     setDraftInStock(false);
-    setDraftMaxPrice(3000);
+    const maxVal = dynamicMaxPrice || 10000;
+    setDraftMinPrice(0);
+    setDraftMaxPrice(maxVal);
+    setDraftFromText('0');
+    setDraftToText(String(maxVal));
   };
 
   const resetAllFilters = () => {
+    if (priceDebounceTimerRef.current) {
+      clearTimeout(priceDebounceTimerRef.current);
+    }
     setSelectedCategory(null);
     setSelectedSizes([]);
     setInStockOnly(false);
-    setMaxPrice(3000);
+    setIsPriceFilterActive(false);
+    setAppliedMinPrice(null);
+    setAppliedMaxPrice(null);
+    setUiMinPrice(0);
+    const maxVal = dynamicMaxPrice || 10000;
+    setUiMaxPrice(maxVal);
+    setInputFromText('0');
+    setInputToText(String(maxVal));
+    setDraftMinPrice(0);
+    setDraftMaxPrice(maxVal);
+    setDraftFromText('0');
+    setDraftToText(String(maxVal));
     setSearchKeyword('');
     setCurrentPage(1);
     navigate('/collections', { replace: true });
@@ -423,7 +760,7 @@ const Collections = () => {
     (selectedCategory !== null ? 1 : 0) +
     (selectedSizes.length > 0 ? selectedSizes.length : 0) +
     (inStockOnly ? 1 : 0) +
-    (maxPrice < 3000 ? 1 : 0) +
+    (isPriceFilterActive ? 1 : 0) +
     (searchKeyword ? 1 : 0);
 
   const handleProductClick = (variantId) => {
@@ -506,26 +843,98 @@ const Collections = () => {
 
           <div className="filter-block accordion-block">
             <div className="accordion-header" onClick={() => toggleAccordion('price')}>
-              <span className="accordion-title">Max Price</span>
+              <span className="accordion-title">Price Range</span>
               <span className="accordion-icon">{openAccordions.price ? '−' : '+'}</span>
             </div>
             {openAccordions.price && (
               <div className="accordion-content">
                 <div className="price-slider-box">
-                  <div className="price-values">
-                    <span>₹0</span>
-                    <span style={{ padding: '0 8px' }}>-</span>
-                    <span>₹{maxPrice.toLocaleString('en-IN')}.00</span>
+                  <div className="price-values" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted, #6b4d6d)', marginBottom: '6px' }}>
+                    <span>₹{uiMinPrice.toLocaleString('en-IN')}</span>
+                    <span>₹{uiMaxPrice.toLocaleString('en-IN')}</span>
                   </div>
                   <input
                     type="range"
                     min="0"
-                    max="10000"
-                    step="500"
-                    value={maxPrice}
-                    onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
+                    max={dynamicMaxPrice || 10000}
+                    step={Math.max(10, Math.round((dynamicMaxPrice || 10000) / 100))}
+                    value={uiMaxPrice}
+                    onChange={handleSliderChange}
+                    onPointerUp={handleSliderRelease}
+                    onMouseUp={handleSliderRelease}
+                    onTouchEnd={handleSliderRelease}
+                    onKeyUp={handleSliderRelease}
                     className="price-range-input"
+                    aria-label="Price range slider"
+                    style={{ width: '100%', accentColor: 'var(--primary-color, #A049A3)', cursor: 'pointer' }}
                   />
+
+                  {/* From and To Price Inputs */}
+                  <div className="price-inputs-row" style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted, #6b4d6d)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        From
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color, #e6cfe7)', borderRadius: '6px', padding: '5px 8px', background: '#ffffff' }}>
+                        <span style={{ color: '#888', marginRight: '3px', fontSize: '0.82rem', fontWeight: '600' }}>₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={uiMaxPrice}
+                          value={inputFromText}
+                          onChange={handleFromInputChange}
+                          onBlur={handleFromInputCommit}
+                          onKeyDown={(e) => e.key === 'Enter' && handleFromInputCommit()}
+                          placeholder="0"
+                          aria-label="From price"
+                          style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary, #2b112c)', fontFamily: 'inherit', background: 'transparent' }}
+                        />
+                      </div>
+                    </div>
+
+                    <span style={{ color: '#aaa', marginTop: '16px', fontSize: '0.9rem' }}>–</span>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted, #6b4d6d)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        To
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color, #e6cfe7)', borderRadius: '6px', padding: '5px 8px', background: '#ffffff' }}>
+                        <span style={{ color: '#888', marginRight: '3px', fontSize: '0.82rem', fontWeight: '600' }}>₹</span>
+                        <input
+                          type="number"
+                          min={uiMinPrice}
+                          max={dynamicMaxPrice || 10000}
+                          value={inputToText}
+                          onChange={handleToInputChange}
+                          onBlur={handleToInputCommit}
+                          onKeyDown={(e) => e.key === 'Enter' && handleToInputCommit()}
+                          placeholder={dynamicMaxPrice ? String(dynamicMaxPrice) : '10000'}
+                          aria-label="To price"
+                          style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary, #2b112c)', fontFamily: 'inherit', background: 'transparent' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {isPriceFilterActive && (
+                    <button
+                      type="button"
+                      onClick={handleResetPriceFilter}
+                      style={{
+                        marginTop: '10px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary-color, #A049A3)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontWeight: 600,
+                        textAlign: 'left'
+                      }}
+                    >
+                      Reset Price
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -611,7 +1020,7 @@ const Collections = () => {
               <div className="loading-spinner-container" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
                 Loading products...
               </div>
-            ) : variants.length === 0 ? (
+            ) : groupedProducts.length === 0 ? (
               <div className="no-products-found" style={{ gridColumn: '1 / -1' }}>
                 <p>No products found matching your selected filters.</p>
                 <button className="btn-reset-empty" onClick={resetAllFilters}>
@@ -619,28 +1028,43 @@ const Collections = () => {
                 </button>
               </div>
             ) : (
-              variants.map((variant) => {
-                const sellPrice = parseFloat(variant.pricing.selling_price);
-                const origPrice = parseFloat(variant.pricing.original_price);
-                const hasDiscount = origPrice > sellPrice;
-                const imgUrl = variant.primary_image ? ASSET_BASE_URL + variant.primary_image.image : '';
-                const isWishlisted = isInWishlist(variant.id);
+              groupedProducts.map((product) => {
+                const defaultVariant = product.defaultVariant;
+                const isWishlisted = isInWishlist(defaultVariant.id);
                 
                 return (
-                  <div key={variant.id} className="product-card">
+                  <div key={product.id} className="product-card">
                     <div
                       className="product-image-wrapper"
-                      onClick={() => handleProductClick(variant.id)}
+                      onClick={() => handleProductClick(defaultVariant.id)}
                     >
-                      {imgUrl ? (
-                        <img src={imgUrl} alt={variant.product.name} className="product-img" />
+                      {product.primaryImageUrl ? (
+                        <>
+                          <img
+                            src={product.primaryImageUrl}
+                            alt={product.name}
+                            className="product-img product-img-primary"
+                            loading="lazy"
+                          />
+                          {product.hoverImageUrl && (
+                            <img
+                              src={product.hoverImageUrl}
+                              alt={`${product.name} alternate view`}
+                              className="product-img product-img-hover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          )}
+                        </>
                       ) : (
                         <div className="product-img-placeholder" style={{height: '100%', backgroundColor: '#f0f0f0'}}></div>
                       )}
 
                       <button
                         className={`wishlist-heart-btn ${isWishlisted ? 'active' : ''}`}
-                        onClick={(e) => toggleWishlist(variant, e)}
+                        onClick={(e) => toggleWishlist(defaultVariant, e)}
                         aria-label="Add to Wishlist"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill={isWishlisted ? '#A049A3' : 'none'} stroke={isWishlisted ? '#A049A3' : '#333333'} strokeWidth="2">
@@ -648,40 +1072,71 @@ const Collections = () => {
                         </svg>
                       </button>
 
-                      {hasDiscount && (
-                        <span className="discount-tag">
-                          {Math.round(((origPrice - sellPrice) / origPrice) * 100)}% OFF
+                      {product.isOutOfStock ? (
+                        <span className="product-status-tag out-of-stock" style={{ position: 'absolute', top: '10px', left: '10px', background: '#dc2626', color: '#fff', fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', zIndex: 2 }}>
+                          Out of Stock
                         </span>
-                      )}
+                      ) : product.hasDiscount ? (
+                        <span className="discount-tag">
+                          {product.maxDiscountPercent}% OFF
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="product-info">
                       <h4
                         className="product-title"
-                        onClick={() => handleProductClick(variant.id)}
+                        onClick={() => handleProductClick(defaultVariant.id)}
                       >
-                        {variant.product.name} {variant.color ? ` - ${variant.color.name}` : ''}
+                        {product.name}
                       </h4>
 
+                      {product.colors && product.colors.length > 0 && (
+                        <div className="product-card-colors" style={{ display: 'flex', gap: '4px', margin: '4px 0 6px', alignItems: 'center' }}>
+                          {product.colors.slice(0, 5).map((col) => (
+                            <span
+                              key={col.id}
+                              title={col.name}
+                              style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                backgroundColor: col.hex_code || '#ccc',
+                                border: '1px solid rgba(0,0,0,0.15)',
+                                display: 'inline-block'
+                              }}
+                            />
+                          ))}
+                          {product.colors.length > 5 && (
+                            <span style={{ fontSize: '0.7rem', color: '#888' }}>+{product.colors.length - 5}</span>
+                          )}
+                          <span style={{ fontSize: '0.72rem', color: '#666', marginLeft: '4px' }}>
+                            {product.colors.length} {product.colors.length === 1 ? 'color' : 'colors'}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="product-pricing">
-                        <span className="price">Rs. {sellPrice.toLocaleString('en-IN')}.00</span>
-                        {hasDiscount && (
-                          <span className="original-price">Rs. {origPrice.toLocaleString('en-IN')}.00</span>
+                        <span className="price">
+                          {product.hasPriceRange ? `From Rs. ${product.minSellingPrice.toLocaleString('en-IN')}.00` : `Rs. ${product.minSellingPrice.toLocaleString('en-IN')}.00`}
+                        </span>
+                        {product.hasDiscount && (
+                          <span className="original-price">Rs. {product.minOriginalPrice.toLocaleString('en-IN')}.00</span>
                         )}
                       </div>
 
                       <div className="product-card-actions">
                         <button
                           className="btn-add-cart"
-                          onClick={(e) => handleAddToCart(variant, e)}
-                          disabled={variant.stock.stock_status === 'out_of_stock'}
+                          onClick={(e) => handleAddToCart(defaultVariant, e)}
+                          disabled={product.isOutOfStock}
                         >
-                          {variant.stock.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
+                          {product.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                         </button>
                         <button
                           className="btn-buy-now"
-                          onClick={(e) => handleBuyNow(variant, e)}
-                          disabled={variant.stock.stock_status === 'out_of_stock'}
+                          onClick={(e) => handleBuyNow(defaultVariant, e)}
+                          disabled={product.isOutOfStock}
                         >
                           Buy Now
                         </button>
@@ -768,22 +1223,64 @@ const Collections = () => {
             </div>
 
             <div className="drawer-section">
-              <h4 className="drawer-section-title">Max Price</h4>
+              <h4 className="drawer-section-title">Price Range</h4>
               <div className="drawer-price-box">
-                <div className="price-inputs-row">
-                  <div className="price-badge">₹0</div>
-                  <span className="dash">-</span>
-                  <div className="price-badge">₹{draftMaxPrice.toLocaleString('en-IN')}.00</div>
+                <div className="price-inputs-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.88rem' }}>
+                  <div className="price-badge">₹{draftMinPrice.toLocaleString('en-IN')}</div>
+                  <span className="dash" style={{ margin: '0 8px', color: '#888' }}>-</span>
+                  <div className="price-badge">₹{draftMaxPrice.toLocaleString('en-IN')}</div>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="10000"
-                  step="500"
+                  max={dynamicMaxPrice || 10000}
+                  step={Math.max(10, Math.round((dynamicMaxPrice || 10000) / 100))}
                   value={draftMaxPrice}
-                  onChange={(e) => setDraftMaxPrice(Number(e.target.value))}
+                  onChange={handleMobileSliderChange}
                   className="modal-range-slider"
+                  style={{ width: '100%', accentColor: 'var(--primary-color, #A049A3)' }}
                 />
+
+                {/* Mobile From and To Price Inputs */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted, #6b4d6d)', marginBottom: '3px', textTransform: 'uppercase' }}>
+                      From
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color, #e6cfe7)', borderRadius: '6px', padding: '6px 8px', background: '#ffffff' }}>
+                      <span style={{ color: '#888', marginRight: '3px', fontSize: '0.82rem' }}>₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max={draftMaxPrice}
+                        value={draftFromText}
+                        onChange={handleMobileFromInputChange}
+                        placeholder="0"
+                        style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary, #2b112c)', fontFamily: 'inherit' }}
+                      />
+                    </div>
+                  </div>
+
+                  <span style={{ color: '#aaa', marginTop: '16px' }}>–</span>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted, #6b4d6d)', marginBottom: '3px', textTransform: 'uppercase' }}>
+                      To
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color, #e6cfe7)', borderRadius: '6px', padding: '6px 8px', background: '#ffffff' }}>
+                      <span style={{ color: '#888', marginRight: '3px', fontSize: '0.82rem' }}>₹</span>
+                      <input
+                        type="number"
+                        min={draftMinPrice}
+                        max={dynamicMaxPrice || 10000}
+                        value={draftToText}
+                        onChange={handleMobileToInputChange}
+                        placeholder={dynamicMaxPrice ? String(dynamicMaxPrice) : '10000'}
+                        style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary, #2b112c)', fontFamily: 'inherit' }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

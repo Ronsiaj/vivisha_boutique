@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAdminAuth } from '../../context/AuthContext.jsx';
 import logo from '../../../assets/images/boutique_logo.png';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { adminLogin, isAuthenticated } = useAdminAuth();
   const [formData, setFormData] = useState({
-    email: 'admin@vivishaboutique.com',
-    password: '••••••••',
+    email: '',
+    password: '',
     rememberMe: true
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -18,23 +27,41 @@ const AdminLogin = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+    if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      setError('Please enter your admin email and password.');
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your admin email address.');
+      return;
+    }
+    if (!formData.password) {
+      setError('Please enter your password.');
       return;
     }
 
     setError('');
     setIsLoading(true);
 
-    // Simulate mock authentication dispatch
-    setTimeout(() => {
+    try {
+      const result = await adminLogin({
+        email: trimmedEmail,
+        password: formData.password
+      });
+
       setIsLoading(false);
-      navigate('/admin/dashboard');
-    }, 800);
+
+      if (result.success && result.user) {
+        navigate('/admin/dashboard');
+      } else {
+        setError(result.message || 'Invalid admin credentials. Please try again.');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setError(err.message || 'Failed to authenticate with admin server.');
+    }
   };
 
   return (
@@ -76,7 +103,7 @@ const AdminLogin = () => {
                 type="email"
                 id="email"
                 name="email"
-                placeholder="admin@vivishaboutique.com"
+                placeholder="youremail@gmail.com"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -94,14 +121,34 @@ const AdminLogin = () => {
                 </svg>
               </span>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 id="password"
                 name="password"
                 placeholder="Enter password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="current-password"
                 required
               />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { useAdminAuth } from '../../context/AuthContext.jsx';
 import AsyncSelect from 'react-select/async';
 import AdminPagination from '../../components/admin/AdminPagination.jsx';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+
 const AdminUsers = () => {
-  const { token } = useAuth();
+  const { token } = useAdminAuth();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,7 +49,7 @@ const AdminUsers = () => {
     if (statusFilter) params.append('status', statusFilter);
 
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/users/list.php?${params.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/users/list.php?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -77,7 +79,7 @@ const AdminUsers = () => {
   const loadOptions = async (inputValue) => {
     if (!inputValue) return [];
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/users/list.php?q=${encodeURIComponent(inputValue)}&limit=10`, {
+      const response = await fetch(`${API_BASE_URL}/users/list.php?q=${encodeURIComponent(inputValue)}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -93,12 +95,24 @@ const AdminUsers = () => {
     }
   };
 
+  const [selectedSearchOption, setSelectedSearchOption] = useState(null);
+
   const handleSelectChange = (selectedOption) => {
+    setSelectedSearchOption(selectedOption);
     if (selectedOption) {
       setSearchQuery(selectedOption.value);
     } else {
       setSearchQuery('');
     }
+    setPage(1);
+  };
+
+  const hasActiveFilters = Boolean(searchQuery || statusFilter);
+
+  const handleClearFilters = () => {
+    setSelectedSearchOption(null);
+    setSearchQuery('');
+    setStatusFilter('');
     setPage(1);
   };
 
@@ -109,7 +123,7 @@ const AdminUsers = () => {
     setError('');
     
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/users/view.php?id=${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/users/view.php?id=${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -146,7 +160,7 @@ const AdminUsers = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost/vivisha_boutique/backend/api/users/status_update.php', {
+      const response = await fetch(`${API_BASE_URL}/users/status_update.php`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +191,7 @@ const AdminUsers = () => {
     setError('');
     
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/address/list.php?user_id=${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/address/list.php?user_id=${user.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -206,7 +220,7 @@ const AdminUsers = () => {
     setError('');
     
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/address/view.php?address_id=${addressId}`, {
+      const response = await fetch(`${API_BASE_URL}/address/view.php?address_id=${addressId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -261,6 +275,7 @@ const AdminUsers = () => {
             defaultOptions 
             loadOptions={loadOptions} 
             onChange={handleSelectChange}
+            value={selectedSearchOption}
             isClearable
             placeholder="Search by name, email, or mobile..."
             styles={{
@@ -292,6 +307,21 @@ const AdminUsers = () => {
             <option value="blocked">Blocked</option>
           </select>
         </div>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="admin-btn admin-btn-clear"
+            title="Clear all filters"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Clear Filters
+          </button>
+        )}
       </div>
 
       {/* Users Table */}

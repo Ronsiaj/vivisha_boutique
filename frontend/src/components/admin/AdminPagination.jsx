@@ -10,7 +10,13 @@ const AdminPagination = ({ currentPage, totalPages, onPageChange }) => {
 
     if (startPage > 1) {
       pages.push(
-        <button key={1} className={`admin-pagination-btn ${currentPage === 1 ? 'active' : ''}`} onClick={() => onPageChange(1)}>
+        <button
+          key={1}
+          type="button"
+          className={`admin-pagination-btn ${currentPage === 1 ? 'active' : ''}`}
+          onClick={() => onPageChange(1)}
+          aria-label="Page 1"
+        >
           1
         </button>
       );
@@ -23,8 +29,10 @@ const AdminPagination = ({ currentPage, totalPages, onPageChange }) => {
       pages.push(
         <button
           key={i}
+          type="button"
           className={`admin-pagination-btn ${currentPage === i ? 'active' : ''}`}
           onClick={() => onPageChange(i)}
+          aria-label={`Page ${i}`}
         >
           {i}
         </button>
@@ -36,7 +44,13 @@ const AdminPagination = ({ currentPage, totalPages, onPageChange }) => {
         pages.push(<span key="dots-2" className="admin-pagination-dots">...</span>);
       }
       pages.push(
-        <button key={totalPages} className={`admin-pagination-btn ${currentPage === totalPages ? 'active' : ''}`} onClick={() => onPageChange(totalPages)}>
+        <button
+          key={totalPages}
+          type="button"
+          className={`admin-pagination-btn ${currentPage === totalPages ? 'active' : ''}`}
+          onClick={() => onPageChange(totalPages)}
+          aria-label={`Page ${totalPages}`}
+        >
           {totalPages}
         </button>
       );
@@ -47,9 +61,11 @@ const AdminPagination = ({ currentPage, totalPages, onPageChange }) => {
   return (
     <div className="admin-pagination-container">
       <button 
+        type="button"
         className="admin-pagination-arrow" 
         disabled={currentPage === 1}
         onClick={() => onPageChange(currentPage - 1)}
+        aria-label="Previous page"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6"></polyline>
@@ -59,9 +75,11 @@ const AdminPagination = ({ currentPage, totalPages, onPageChange }) => {
       {renderPageNumbers()}
 
       <button 
+        type="button"
         className="admin-pagination-arrow" 
         disabled={currentPage === totalPages}
         onClick={() => onPageChange(currentPage + 1)}
+        aria-label="Next page"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6"></polyline>

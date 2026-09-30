@@ -40,23 +40,43 @@ if ($accountType !== 'admin') {
 $adminAuth = authenticateAdmin();
 checkAdminRole($adminAuth, ['admin']);
 
-$idInput = isset($_GET['id']) ? trim((string)$_GET['id']) : '';
+$allowedParams = ['id'];
 
-if ($idInput === '') {
-    sendResponse(false, 'Product ID is required.', null, 422);
+foreach (array_keys($_GET) as $param) {
+    if (!in_array($param, $allowedParams, true)) {
+        sendResponse(false, "Invalid query parameter: {$param}.", [
+            'allowed_parameters' => $allowedParams
+        ], 422);
+    }
 }
 
-if (!preg_match('/^[1-9][0-9]*$/', $idInput)) {
-    sendResponse(false, 'Product ID must be a valid positive integer.', null, 422);
+$idInput = $_GET['id'] ?? null;
+
+if ($idInput === null || $idInput === '') {
+    sendResponse(false, 'id is required.', null, 422);
 }
 
-$productId = (int)$idInput;
+if (
+    filter_var($idInput, FILTER_VALIDATE_INT) === false ||
+    (int)$idInput <= 0
+) {
+    sendResponse(false, 'id must be a valid positive integer.', null, 422);
+}
+
+$id = (int)$idInput;
 
 try {
     $stmt = $pdo->prepare(
         "SELECT
             p.id,
             p.category_id,
+            c.name AS category_name,
+            c.status AS category_status,
+            p.hsn_profile_id,
+            hp.name AS hsn_profile_name,
+            hp.hsn_code,
+            hp.description AS hsn_description,
+            hp.status AS hsn_profile_status,
             p.name,
             p.slug,
             p.description,
@@ -65,21 +85,17 @@ try {
             p.is_best_seller,
             p.status,
             p.created_at,
-            p.updated_at,
-            c.name AS category_name,
-            c.slug AS category_slug,
-            c.description AS category_description,
-            c.image AS category_image,
-            c.sort_order AS category_sort_order,
-            c.status AS category_status
+            p.updated_at
          FROM products p
          INNER JOIN categories c
             ON c.id = p.category_id
+         LEFT JOIN hsn_profiles hp
+            ON hp.id = p.hsn_profile_id
          WHERE p.id = :id
          LIMIT 1"
     );
 
-    $stmt->bindValue(':id', $productId, PDO::PARAM_INT);
+    $stmt->bindValue(':id', $id, PDO::PARAM_INT);
     $stmt->execute();
 
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -91,16 +107,23 @@ try {
     sendResponse(true, 'Product retrieved successfully.', [
         'product' => [
             'id' => (int)$product['id'],
-            'category_id' => (int)$product['category_id'],
+
             'category' => [
                 'id' => (int)$product['category_id'],
                 'name' => $product['category_name'],
-                'slug' => $product['category_slug'],
-                'description' => $product['category_description'],
-                'image' => $product['category_image'],
-                'sort_order' => (int)$product['category_sort_order'],
                 'status' => $product['category_status']
             ],
+
+            'hsn_profile' => $product['hsn_profile_id'] !== null
+                ? [
+                    'id' => (int)$product['hsn_profile_id'],
+                    'name' => $product['hsn_profile_name'],
+                    'hsn_code' => $product['hsn_code'],
+                    'description' => $product['hsn_description'],
+                    'status' => $product['hsn_profile_status']
+                ]
+                : null,
+
             'name' => $product['name'],
             'slug' => $product['slug'],
             'description' => $product['description'],
@@ -111,7 +134,7 @@ try {
             'created_at' => $product['created_at'],
             'updated_at' => $product['updated_at']
         ]
-    ], 200);
+    ]);
 
 } catch (PDOException $e) {
     sendResponse(
@@ -122,7 +145,6 @@ try {
             : null,
         500
     );
-
 } catch (Throwable $e) {
     sendResponse(
         false,

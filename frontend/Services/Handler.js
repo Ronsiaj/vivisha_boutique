@@ -28,8 +28,8 @@ const Handler = async ({ method, url, data = {}, headers = {} }) => {
             headers: requestHeaders
         });
 
-        // If response is zip/binary or success flag is true
-        if (requestHeaders['Content-Type'] === 'application/zip' || response.success) {
+        // If response is zip/binary or success/status flag is true
+        if (requestHeaders['Content-Type'] === 'application/zip' || response.success || response.status === true) {
             responseData.success = true;
             responseData.data = response;
             responseData.status = 200;

@@ -84,7 +84,7 @@ const PrivacyPolicy = () => {
           <div className="policy-section-block">
             <h2 className="section-title">Contact Us</h2>
             <p className="section-text">
-              For privacy-related questions, please contact us at <strong>Boutique@gmail.com</strong>.
+              For privacy-related questions, please contact us at <strong>vivishaboutique1131@gmail.com</strong>.
             </p>
           </div>
 

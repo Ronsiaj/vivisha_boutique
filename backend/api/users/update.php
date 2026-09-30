@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/db.php';
@@ -10,140 +11,354 @@ header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: PUT, PATCH, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+
+/*
+|--------------------------------------------------------------------------
+| Handle Preflight Request
+|--------------------------------------------------------------------------
+*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Validate Request Method
+|--------------------------------------------------------------------------
+*/
+
 if (!in_array($_SERVER['REQUEST_METHOD'], ['PUT', 'PATCH'], true)) {
-    sendResponse(false, 'Only PUT or PATCH method is allowed.', null, 405);
+    sendResponse(
+        false,
+        'Only PUT or PATCH method is allowed.',
+        null,
+        405
+    );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Authenticate User
+|--------------------------------------------------------------------------
+*/
+
 $decoded = authenticate();
+
 validateJWTData($decoded);
 
 $accountType = getAuthenticatedType($decoded);
 $authenticatedId = getAuthenticatedId($decoded);
 
 if ($authenticatedId <= 0) {
-    sendResponse(false, 'Invalid authenticated account.', null, 401);
+    sendResponse(
+        false,
+        'Invalid authenticated account.',
+        null,
+        401
+    );
 }
 
 if ($accountType !== 'user') {
-    sendResponse(false, 'User access only.', null, 403);
+    sendResponse(
+        false,
+        'User access only.',
+        null,
+        403
+    );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Get Authenticated User
+|--------------------------------------------------------------------------
+*/
+
 $userAuth = authenticateUser();
+
 $userId = getAuthenticatedId($userAuth);
 
 if ($userId <= 0) {
-    sendResponse(false, 'Invalid authenticated user.', null, 401);
+    sendResponse(
+        false,
+        'Invalid authenticated user.',
+        null,
+        401
+    );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Validate Content Type
+|--------------------------------------------------------------------------
+*/
 
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 
 if (stripos($contentType, 'application/json') === false) {
-    sendResponse(false, 'Content-Type must be application/json.', null, 415);
+    sendResponse(
+        false,
+        'Content-Type must be application/json.',
+        null,
+        415
+    );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Read Request Body
+|--------------------------------------------------------------------------
+*/
 
 $rawInput = file_get_contents('php://input');
 
 if ($rawInput === false || trim($rawInput) === '') {
-    sendResponse(false, 'Request body is required.', null, 400);
+    sendResponse(
+        false,
+        'Request body is required.',
+        null,
+        400
+    );
 }
 
 $data = json_decode($rawInput, true);
 
-if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
-    sendResponse(false, 'Invalid JSON request body.', null, 400);
+if (
+    json_last_error() !== JSON_ERROR_NONE ||
+    !is_array($data)
+) {
+    sendResponse(
+        false,
+        'Invalid JSON request body.',
+        null,
+        400
+    );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| DOB Cannot Be Updated
+|--------------------------------------------------------------------------
+|
+| date_of_birth is intentionally protected.
+| User can update only name, mobile and email.
+|
+*/
+
+if (
+    array_key_exists('date_of_birth', $data) ||
+    array_key_exists('dob', $data)
+) {
+    sendResponse(
+        false,
+        'Date of birth cannot be updated.',
+        [
+            'protected_fields' => [
+                'date_of_birth'
+            ]
+        ],
+        422
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Allowed Update Fields
+|--------------------------------------------------------------------------
+*/
 
 $allowedFields = [
     'name',
     'mobile',
-    'email',
-    'date_of_birth'
+    'email'
 ];
 
 foreach (array_keys($data) as $field) {
+
     if (!in_array($field, $allowedFields, true)) {
-        sendResponse(false, "Invalid field: {$field}.", [
-            'allowed_fields' => $allowedFields
-        ], 422);
+
+        sendResponse(
+            false,
+            "Invalid field: {$field}.",
+            [
+                'allowed_fields' => $allowedFields
+            ],
+            422
+        );
     }
 }
 
-$hasName = array_key_exists('name', $data);
+
+/*
+|--------------------------------------------------------------------------
+| Check Fields Provided
+|--------------------------------------------------------------------------
+*/
+
+$hasName   = array_key_exists('name', $data);
 $hasMobile = array_key_exists('mobile', $data);
-$hasEmail = array_key_exists('email', $data);
-$hasDateOfBirth = array_key_exists('date_of_birth', $data);
+$hasEmail  = array_key_exists('email', $data);
 
 if (
     !$hasName &&
     !$hasMobile &&
-    !$hasEmail &&
-    !$hasDateOfBirth
+    !$hasEmail
 ) {
-    sendResponse(false, 'At least one field must be provided for update.', [
-        'updatable_fields' => $allowedFields
-    ], 422);
+    sendResponse(
+        false,
+        'At least one field must be provided for update.',
+        [
+            'updatable_fields' => $allowedFields
+        ],
+        422
+    );
 }
 
-$name = null;
+
+/*
+|--------------------------------------------------------------------------
+| Initialize Values
+|--------------------------------------------------------------------------
+*/
+
+$name   = null;
 $mobile = null;
-$email = null;
-$dateOfBirth = null;
+$email  = null;
+
+
+/*
+|--------------------------------------------------------------------------
+| Validate Name
+|--------------------------------------------------------------------------
+*/
 
 if ($hasName) {
+
     if (!is_string($data['name'])) {
-        sendResponse(false, 'Name must be a string.', null, 422);
+        sendResponse(
+            false,
+            'Name must be a string.',
+            null,
+            422
+        );
     }
 
     $name = trim($data['name']);
 
     if ($name === '') {
-        sendResponse(false, 'Name cannot be empty.', null, 422);
+        sendResponse(
+            false,
+            'Name cannot be empty.',
+            null,
+            422
+        );
     }
 
     if (mb_strlen($name) < 2) {
-        sendResponse(false, 'Name must contain at least 2 characters.', null, 422);
+        sendResponse(
+            false,
+            'Name must contain at least 2 characters.',
+            null,
+            422
+        );
     }
 
     if (mb_strlen($name) > 100) {
-        sendResponse(false, 'Name must not exceed 100 characters.', null, 422);
+        sendResponse(
+            false,
+            'Name must not exceed 100 characters.',
+            null,
+            422
+        );
     }
 
     if (!preg_match("/^[\p{L}\s.'-]+$/u", $name)) {
-        sendResponse(false, 'Name contains invalid characters.', null, 422);
+        sendResponse(
+            false,
+            'Name contains invalid characters.',
+            null,
+            422
+        );
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Validate Mobile
+|--------------------------------------------------------------------------
+*/
+
 if ($hasMobile) {
-    if (!is_string($data['mobile']) && !is_int($data['mobile'])) {
-        sendResponse(false, 'Mobile number must be a string or integer.', null, 422);
+
+    if (
+        !is_string($data['mobile']) &&
+        !is_int($data['mobile'])
+    ) {
+        sendResponse(
+            false,
+            'Mobile number must be a string or integer.',
+            null,
+            422
+        );
     }
 
     $mobile = trim((string)$data['mobile']);
-    $mobile = preg_replace('/\s+/', '', $mobile);
+
+    $mobile = preg_replace(
+        '/\s+/',
+        '',
+        $mobile
+    );
 
     if ($mobile === null || $mobile === '') {
-        sendResponse(false, 'Mobile number cannot be empty.', null, 422);
+        sendResponse(
+            false,
+            'Mobile number cannot be empty.',
+            null,
+            422
+        );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Remove +91 / 91 Prefix
+    |--------------------------------------------------------------------------
+    */
+
     if (str_starts_with($mobile, '+91')) {
+
         $mobile = substr($mobile, 3);
+
     } elseif (
         str_starts_with($mobile, '91') &&
         strlen($mobile) === 12
     ) {
+
         $mobile = substr($mobile, 2);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Indian Mobile Validation
+    |--------------------------------------------------------------------------
+    */
+
     if (!preg_match('/^[6-9][0-9]{9}$/', $mobile)) {
+
         sendResponse(
             false,
             'Mobile number must be a valid 10-digit Indian mobile number.',
@@ -153,88 +368,82 @@ if ($hasMobile) {
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Validate Email
+|--------------------------------------------------------------------------
+*/
+
 if ($hasEmail) {
-    if ($data['email'] !== null && !is_string($data['email'])) {
-        sendResponse(false, 'Email must be a string or null.', null, 422);
+
+    if (
+        $data['email'] !== null &&
+        !is_string($data['email'])
+    ) {
+        sendResponse(
+            false,
+            'Email must be a string or null.',
+            null,
+            422
+        );
     }
 
     $email = $data['email'] === null
         ? null
         : strtolower(trim($data['email']));
 
+    /*
+    |--------------------------------------------------------------------------
+    | Empty Email Becomes NULL
+    |--------------------------------------------------------------------------
+    */
+
     if ($email === '') {
         $email = null;
     }
 
     if ($email !== null) {
+
         if (mb_strlen($email) > 150) {
-            sendResponse(false, 'Email must not exceed 150 characters.', null, 422);
+
+            sendResponse(
+                false,
+                'Email must not exceed 150 characters.',
+                null,
+                422
+            );
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            sendResponse(false, 'Please enter a valid email address.', null, 422);
-        }
-    }
-}
 
-if ($hasDateOfBirth) {
-    if (
-        $data['date_of_birth'] !== null &&
-        !is_string($data['date_of_birth'])
-    ) {
-        sendResponse(false, 'date_of_birth must be a string or null.', null, 422);
-    }
-
-    $dateOfBirth = $data['date_of_birth'] === null
-        ? null
-        : trim($data['date_of_birth']);
-
-    if ($dateOfBirth === '') {
-        $dateOfBirth = null;
-    }
-
-    if ($dateOfBirth !== null) {
-        $date = DateTime::createFromFormat(
-            'Y-m-d',
-            $dateOfBirth
-        );
-
-        $errors = DateTime::getLastErrors();
-
-        $hasErrors = $errors !== false &&
-            (
-                $errors['warning_count'] > 0 ||
-                $errors['error_count'] > 0
-            );
-
-        if (
-            !$date ||
-            $hasErrors ||
-            $date->format('Y-m-d') !== $dateOfBirth
-        ) {
             sendResponse(
                 false,
-                'date_of_birth must be in YYYY-MM-DD format.',
-                null,
-                422
-            );
-        }
-
-        $today = new DateTime('today');
-
-        if ($date > $today) {
-            sendResponse(
-                false,
-                'date_of_birth cannot be a future date.',
+                'Please enter a valid email address.',
                 null,
                 422
             );
         }
     }
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Update User
+|--------------------------------------------------------------------------
+*/
 
 try {
+
     $pdo->beginTransaction();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch Current User
+    |--------------------------------------------------------------------------
+    */
 
     $currentStmt = $pdo->prepare(
         "SELECT
@@ -261,9 +470,19 @@ try {
 
     $currentStmt->execute();
 
-    $currentUser = $currentStmt->fetch(PDO::FETCH_ASSOC);
+    $currentUser = $currentStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | User Not Found
+    |--------------------------------------------------------------------------
+    */
 
     if (!$currentUser) {
+
         $pdo->rollBack();
 
         sendResponse(
@@ -274,7 +493,15 @@ try {
         );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Blocked User Check
+    |--------------------------------------------------------------------------
+    */
+
     if ($currentUser['status'] === 'blocked') {
+
         $pdo->rollBack();
 
         sendResponse(
@@ -285,7 +512,15 @@ try {
         );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inactive User Check
+    |--------------------------------------------------------------------------
+    */
+
     if ($currentUser['status'] === 'inactive') {
+
         $pdo->rollBack();
 
         sendResponse(
@@ -296,7 +531,15 @@ try {
         );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check Duplicate Mobile
+    |--------------------------------------------------------------------------
+    */
+
     if ($hasMobile) {
+
         $mobileStmt = $pdo->prepare(
             "SELECT id
              FROM users
@@ -320,6 +563,7 @@ try {
         $mobileStmt->execute();
 
         if ($mobileStmt->fetch()) {
+
             $pdo->rollBack();
 
             sendResponse(
@@ -331,7 +575,15 @@ try {
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check Duplicate Email
+    |--------------------------------------------------------------------------
+    */
+
     if ($hasEmail && $email !== null) {
+
         $emailStmt = $pdo->prepare(
             "SELECT id
              FROM users
@@ -355,6 +607,7 @@ try {
         $emailStmt->execute();
 
         if ($emailStmt->fetch()) {
+
             $pdo->rollBack();
 
             sendResponse(
@@ -366,32 +619,75 @@ try {
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Build Dynamic Update
+    |--------------------------------------------------------------------------
+    */
+
     $updateFields = [];
+
     $params = [
         ':id' => $userId
     ];
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Name
+    |--------------------------------------------------------------------------
+    */
+
     if ($hasName) {
+
         $updateFields[] = 'name = :name';
+
         $params[':name'] = $name;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile
+    |--------------------------------------------------------------------------
+    */
+
     if ($hasMobile) {
+
         $updateFields[] = 'mobile = :mobile';
+
         $params[':mobile'] = $mobile;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Email
+    |--------------------------------------------------------------------------
+    */
+
     if ($hasEmail) {
+
         $updateFields[] = 'email = :email';
+
         $params[':email'] = $email;
     }
 
-    if ($hasDateOfBirth) {
-        $updateFields[] = 'date_of_birth = :date_of_birth';
-        $params[':date_of_birth'] = $dateOfBirth;
-    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORTANT
+    |--------------------------------------------------------------------------
+    |
+    | date_of_birth is NOT included here.
+    | So DOB can never be modified through this API.
+    |
+    */
+
 
     if (empty($updateFields)) {
+
         $pdo->rollBack();
 
         sendResponse(
@@ -402,6 +698,13 @@ try {
         );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Execute Update
+    |--------------------------------------------------------------------------
+    */
+
     $sql = "
         UPDATE users
         SET " . implode(', ', $updateFields) . "
@@ -410,20 +713,33 @@ try {
 
     $updateStmt = $pdo->prepare($sql);
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bind Parameters
+    |--------------------------------------------------------------------------
+    */
+
     foreach ($params as $key => $value) {
+
         if ($key === ':id') {
+
             $updateStmt->bindValue(
                 $key,
                 $value,
                 PDO::PARAM_INT
             );
+
         } elseif ($value === null) {
+
             $updateStmt->bindValue(
                 $key,
                 null,
                 PDO::PARAM_NULL
             );
+
         } else {
+
             $updateStmt->bindValue(
                 $key,
                 $value,
@@ -433,6 +749,13 @@ try {
     }
 
     $updateStmt->execute();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch Updated User
+    |--------------------------------------------------------------------------
+    */
 
     $fetchStmt = $pdo->prepare(
         "SELECT
@@ -458,15 +781,32 @@ try {
 
     $fetchStmt->execute();
 
-    $user = $fetchStmt->fetch(PDO::FETCH_ASSOC);
+    $user = $fetchStmt->fetch(
+        PDO::FETCH_ASSOC
+    );
 
     if (!$user) {
+
         throw new RuntimeException(
             'Unable to retrieve updated user.'
         );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Commit
+    |--------------------------------------------------------------------------
+    */
+
     $pdo->commit();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Success Response
+    |--------------------------------------------------------------------------
+    */
 
     sendResponse(
         true,
@@ -477,7 +817,11 @@ try {
                 'name' => $user['name'],
                 'mobile' => $user['mobile'],
                 'email' => $user['email'],
+
+                // DOB is only returned.
+                // It is NOT editable through this API.
                 'date_of_birth' => $user['date_of_birth'],
+
                 'status' => $user['status'],
                 'last_login' => $user['last_login'],
                 'created_at' => $user['created_at'],
@@ -487,15 +831,41 @@ try {
         200
     );
 
+
+/*
+|--------------------------------------------------------------------------
+| PDO Exception
+|--------------------------------------------------------------------------
+*/
+
 } catch (PDOException $e) {
+
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Duplicate Entry
+    |--------------------------------------------------------------------------
+    */
+
     if ($e->getCode() === '23000') {
-        $message = strtolower($e->getMessage());
+
+        $message = strtolower(
+            $e->getMessage()
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Mobile
+        |--------------------------------------------------------------------------
+        */
 
         if (str_contains($message, 'mobile')) {
+
             sendResponse(
                 false,
                 'Mobile number is already registered with another account.',
@@ -504,7 +874,15 @@ try {
             );
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate Email
+        |--------------------------------------------------------------------------
+        */
+
         if (str_contains($message, 'email')) {
+
             sendResponse(
                 false,
                 'Email address is already registered with another account.',
@@ -514,16 +892,33 @@ try {
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | General Database Error
+    |--------------------------------------------------------------------------
+    */
+
     sendResponse(
         false,
         'Unable to update profile.',
         defined('APP_ENV') && APP_ENV === 'development'
-            ? ['error' => $e->getMessage()]
+            ? [
+                'error' => $e->getMessage()
+            ]
             : null,
         500
     );
 
+
+/*
+|--------------------------------------------------------------------------
+| General Exception
+|--------------------------------------------------------------------------
+*/
+
 } catch (Throwable $e) {
+
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
@@ -532,7 +927,9 @@ try {
         false,
         'An unexpected error occurred.',
         defined('APP_ENV') && APP_ENV === 'development'
-            ? ['error' => $e->getMessage()]
+            ? [
+                'error' => $e->getMessage()
+            ]
             : null,
         500
     );

@@ -1,12 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { useAdminAuth } from '../../context/AuthContext.jsx';
 import AdminPagination from '../../components/admin/AdminPagination.jsx';
+import Select from 'react-select';
+import AsyncSelect from 'react-select/async';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return '';
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
+    return imagePath;
+  }
+  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+  const backendRoot = API_BASE_URL.replace(/\/api\/?$/, '');
+  return `${backendRoot}/${cleanPath}`;
+};
+
+const customSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    borderColor: state.isFocused ? 'var(--primary-color, #A049A3)' : '#d1d5db',
+    boxShadow: state.isFocused ? '0 0 0 1px var(--primary-color, #A049A3)' : 'none',
+    borderRadius: '6px',
+    fontSize: '0.88rem',
+    minHeight: '38px',
+    backgroundColor: '#fff',
+    '&:hover': {
+      borderColor: state.isFocused ? 'var(--primary-color, #A049A3)' : '#9ca3af'
+    }
+  }),
+  clearIndicator: (base) => ({
+    ...base,
+    cursor: 'pointer',
+    color: '#9ca3af',
+    padding: '4px',
+    '&:hover': { color: '#be123c' }
+  }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 99999,
+    boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+    borderRadius: '8px',
+    fontSize: '0.88rem'
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 99999
+  }),
+  option: (base, state) => ({
+    ...base,
+    fontSize: '0.86rem',
+    backgroundColor: state.isSelected
+      ? 'var(--primary-color, #A049A3)'
+      : state.isFocused
+      ? '#f3e8ff'
+      : 'transparent',
+    color: state.isSelected ? '#fff' : '#1f2937',
+    cursor: 'pointer'
+  })
+};
 
 const AdminCategories = () => {
-  const { token } = useAuth();
+  const { token } = useAdminAuth();
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSearchOption, setSelectedSearchOption] = useState(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,24 +89,32 @@ const AdminCategories = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch Categories
-  const fetchCategories = async (page = 1) => {
+  const fetchCategories = async (page = 1, searchOverride = null) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch(`http://localhost/vivisha_boutique/backend/api/category/list.php?page=${page}&limit=10`, {
+      const qVal = searchOverride !== null ? searchOverride : searchQuery;
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '10'
+      });
+      if (qVal.trim()) queryParams.append('q', qVal.trim());
+
+      const response = await fetch(`${API_BASE_URL}/category/list.php?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const result = await response.json();
-      if (result.status) {
-        setCategories(result.data.categories);
+      if (result.status && result.data) {
+        setCategories(result.data.categories || []);
         if (result.data.pagination) {
           setCurrentPage(result.data.pagination.page);
           setTotalPages(result.data.pagination.total_pages);
           setTotalRecords(result.data.pagination.total_records);
         }
       } else {
+        setCategories([]);
         setError(result.message || 'Failed to fetch categories');
       }
     } catch (err) {
@@ -59,6 +127,44 @@ const AdminCategories = () => {
   useEffect(() => {
     fetchCategories(1);
   }, [token]);
+
+  // Load options dynamically for AsyncSelect search
+  const loadCategoryOptions = async (inputValue) => {
+    if (!inputValue || !inputValue.trim()) return [];
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/category/list.php?q=${encodeURIComponent(inputValue.trim())}&limit=10`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (result.status && result.data?.categories) {
+        return result.data.categories.map((c) => ({
+          value: c.name,
+          label: `${c.name} (${c.slug || ''})`,
+          category: c
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.error('Error loading category search options:', err);
+      return [];
+    }
+  };
+
+  const handleSearchSelectChange = (selectedOption) => {
+    setSelectedSearchOption(selectedOption);
+    const query = selectedOption ? selectedOption.value : '';
+    setSearchQuery(query);
+    fetchCategories(1, query);
+  };
+
+  const hasActiveFilters = Boolean(searchQuery || selectedSearchOption);
+
+  const handleClearFilters = () => {
+    setSelectedSearchOption(null);
+    setSearchQuery('');
+    fetchCategories(1, '');
+  };
 
   // Handle Input Changes
   const handleInputChange = (e) => {
@@ -116,8 +222,8 @@ const AdminCategories = () => {
     setError('');
 
     const url = modalMode === 'add' 
-      ? 'http://localhost/vivisha_boutique/backend/api/category/create.php'
-      : 'http://localhost/vivisha_boutique/backend/api/category/update.php';
+      ? `${API_BASE_URL}/category/create.php`
+      : `${API_BASE_URL}/category/update.php`;
 
     const payload = new FormData();
     if (modalMode === 'edit') payload.append('id', formData.id);
@@ -176,6 +282,40 @@ const AdminCategories = () => {
         </div>
       </div>
 
+      {/* Filter and Search Bar */}
+      <div className="admin-filter-bar" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
+        <div style={{ flex: '1', minWidth: '260px' }}>
+          <AsyncSelect
+            cacheOptions
+            defaultOptions={false}
+            loadOptions={loadCategoryOptions}
+            value={selectedSearchOption}
+            onChange={handleSearchSelectChange}
+            placeholder="Search categories by name or slug..."
+            isClearable
+            noOptionsMessage={({ inputValue }) =>
+              !inputValue ? 'Type to search categories...' : 'No matching categories found'
+            }
+            styles={customSelectStyles}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="admin-btn admin-btn-clear"
+            title="Clear all filters"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Clear Filters
+          </button>
+        )}
+      </div>
+
       {error && !isModalOpen && (
         <div className="admin-alert admin-alert-error" style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#fdf2f8', color: '#9d174d', border: '1px solid #fbcfe8', borderRadius: '8px' }}>
           {error}
@@ -211,7 +351,7 @@ const AdminCategories = () => {
                       <td>
                         {cat.image ? (
                           <img 
-                            src={`http://localhost/vivisha_boutique/backend/${cat.image}`} 
+                            src={getImageUrl(cat.image)} 
                             alt={cat.name} 
                             style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e5e7eb' }}
                           />
@@ -297,7 +437,7 @@ const AdminCategories = () => {
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
                   {formData.imageUrl ? (
                     <img 
-                      src={`http://localhost/vivisha_boutique/backend/${formData.imageUrl}`} 
+                      src={getImageUrl(formData.imageUrl)} 
                       alt={formData.name} 
                       style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #F6EDF6' }}
                     />
@@ -387,16 +527,21 @@ const AdminCategories = () => {
                   </div>
                   <div style={{ flex: '1 1 calc(50% - 8px)' }}>
                     <label className="admin-label">Status</label>
-                    <select 
-                      name="status" 
-                      value={formData.status} 
-                      onChange={handleInputChange}
-                      className="admin-input"
-                      style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'none\' stroke=\'%236b7280\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'3 5 8 10 13 5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center' }}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                    <Select
+                      name="status"
+                      options={[
+                        { value: 'active', label: 'Active' },
+                        { value: 'inactive', label: 'Inactive' }
+                      ]}
+                      value={[
+                        { value: 'active', label: 'Active' },
+                        { value: 'inactive', label: 'Inactive' }
+                      ].find(o => o.value === formData.status) || { value: 'active', label: 'Active' }}
+                      onChange={(opt) => setFormData(prev => ({ ...prev, status: opt ? opt.value : 'active' }))}
+                      isClearable={false}
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                      styles={customSelectStyles}
+                    />
                   </div>
                 </div>
 

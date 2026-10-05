@@ -5,6 +5,7 @@ frontend/.env
 frontend/.env.*
 
 # Backend
+backend/
 backend/vendor/
 backend/.env
 

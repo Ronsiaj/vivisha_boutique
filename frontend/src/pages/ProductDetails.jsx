@@ -1169,14 +1169,28 @@ const ProductDetails = () => {
                   const defVariant = relProduct.defaultVariant;
                   const isRelWishlisted = defVariant ? isInWishlist(defVariant.id) : false;
                   const isNew = relProduct.is_new_arrival === 1;
+                  const discountPercent = relProduct.hasDiscount && relProduct.minOriginalPrice > relProduct.minSellingPrice
+                    ? Math.round(((relProduct.minOriginalPrice - relProduct.minSellingPrice) / relProduct.minOriginalPrice) * 100)
+                    : 0;
 
                   return (
                     <div
                       key={relProduct.productId}
                       className="product-card related-product-card"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`View ${relProduct.name}`}
                       onClick={() => {
                         if (defVariant) {
                           navigate(`/product/${defVariant.id}`);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (defVariant) {
+                            navigate(`/product/${defVariant.id}`);
+                          }
                         }
                       }}
                       style={{ cursor: 'pointer' }}
@@ -1354,6 +1368,11 @@ const ProductDetails = () => {
                           {relProduct.hasDiscount && (
                             <span className="original-price">
                               Rs. {relProduct.minOriginalPrice.toLocaleString('en-IN')}.00
+                            </span>
+                          )}
+                          {discountPercent > 0 && (
+                            <span className="related-discount-badge">
+                              {discountPercent}% OFF
                             </span>
                           )}
                         </div>

@@ -22,14 +22,18 @@ const getImageUrl = (imagePath) => {
 // Utility function to dynamically load Razorpay Checkout SDK
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
-    if (window.Razorpay) {
+    if (typeof window !== 'undefined' && window.Razorpay) {
       resolve(true);
       return;
     }
     const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
     if (existingScript) {
-      existingScript.onload = () => resolve(true);
-      existingScript.onerror = () => resolve(false);
+      if (window.Razorpay) {
+        resolve(true);
+      } else {
+        existingScript.addEventListener('load', () => resolve(true), { once: true });
+        existingScript.addEventListener('error', () => resolve(false), { once: true });
+      }
       return;
     }
     const script = document.createElement('script');

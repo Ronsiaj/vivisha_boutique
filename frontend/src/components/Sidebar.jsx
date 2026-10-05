@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import logo from '../../assets/images/boutique_logo.png';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/vivisha_boutique/backend/api';
 
@@ -20,6 +21,32 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
       setCategories(initialCategories);
     }
   }, [initialCategories]);
+
+  // Prevent background scrolling when drawer is open & handle Escape key
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isOpen, onClose]);
+
+  // Close sidebar on route change
+  useEffect(() => {
+    if (isOpen) {
+      onClose();
+    }
+  }, [location.pathname, location.search]);
 
   // Fetch active categories if not passed or empty
   useEffect(() => {
@@ -69,48 +96,45 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
     { id: 'terms', path: '/terms', label: 'Terms and Conditions', hasArrow: false }
   ];
 
+  const firstName = user?.name ? user.name.split(' ')[0] : 'User';
+
   return (
     <>
       {/* Overlay Backdrop */}
       <div
         className={`sidebar-overlay ${isOpen ? 'open' : ''}`}
         onClick={onClose}
+        aria-hidden={!isOpen}
       ></div>
 
       {/* Mobile Sidebar Drawer Panel */}
-      <div className={`boutique-sidebar ${isOpen ? 'open' : ''}`}>
-        {/* Header Bar using Consistent Vivisha Purple (#A049A3) */}
+      <aside
+        className={`boutique-sidebar ${isOpen ? 'open' : ''}`}
+        aria-label="Mobile Navigation Menu"
+      >
+        {/* Top Header: Brand Logo/Badge & Circular Close Button */}
         <div className="sidebar-header">
-          <div className="sidebar-title-area">
-            <span className="sidebar-menu-title">Menu</span>
-            <button className="sidebar-close-btn" onClick={onClose} aria-label="Close Menu">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-
-          {/* Show username & mobile ONLY after login */}
-          {isAuthenticated && (
-            <div className="sidebar-user-row">
-              <div className="sidebar-user-info-text">
-                <h3 className="user-name">{user?.name || 'User Profile'}</h3>
-                <p className="user-mobile">{user?.phone || ''}</p>
-              </div>
-              <div className="sidebar-user-profile-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
+          <Link to="/" onClick={onClose} className="sidebar-brand-link">
+            <div className="sidebar-brand-badge">
+              <img src={logo} alt="Vivisha Logo" className="sidebar-brand-logo-img" />
             </div>
-          )}
+            <div className="sidebar-brand-text">
+              <span className="sidebar-brand-title">Vivisha</span>
+              <span className="sidebar-brand-subtitle">Boutique</span>
+            </div>
+          </Link>
+
+          <button className="sidebar-close-btn" onClick={onClose} aria-label="Close Menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
-        {/* Navigation List — Site navigation */}
+        {/* Scrollable Navigation List */}
         <div className="sidebar-menu-body">
-          <div className="sidebar-nav-list">
+          <nav className="sidebar-nav-list">
             {menuItems.map((item) => {
               const isActive =
                 !item.hasArrow &&
@@ -120,7 +144,7 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
 
               if (item.hasArrow) {
                 return (
-                  <React.Fragment key={item.id}>
+                  <div key={item.id} className="sidebar-nav-item-wrapper">
                     <button
                       type="button"
                       className={`sidebar-nav-item-row has-submenu ${isCategoriesExpanded ? 'expanded' : ''}`}
@@ -131,12 +155,12 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
                       <span className="sidebar-nav-text">{item.label}</span>
                       <span className={`sidebar-nav-arrow ${isCategoriesExpanded ? 'expanded' : ''}`}>
                         <svg
-                          width="18"
-                          height="18"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2.4"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           className="sidebar-arrow-icon"
@@ -175,7 +199,7 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
                         })}
                       </div>
                     )}
-                  </React.Fragment>
+                  </div>
                 );
               }
 
@@ -191,33 +215,63 @@ const Sidebar = ({ isOpen, onClose, initialCategories = [] }) => {
                 </div>
               );
             })}
-
-            {/* Login / Register or Logout */}
-            {isAuthenticated ? (
-              <button onClick={handleLogout} className="sidebar-nav-item auth-item logout-link">
-                <span className="auth-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                </span>
-                <span className="sidebar-nav-text">Logout</span>
-              </button>
-            ) : (
-              <Link to="/login" onClick={onClose} className="sidebar-nav-item auth-item login-link">
-                <span className="auth-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
-                </span>
-                <span className="sidebar-nav-text">Login / Register</span>
-              </Link>
-            )}
-          </div>
+          </nav>
         </div>
-      </div>
+
+        {/* Bottom Footer Section: Profile Pill & Shop Now CTA (Matching reference UI) */}
+        <div className="sidebar-footer-actions">
+          {isAuthenticated ? (
+            <div className="sidebar-auth-group">
+              <Link
+                to="/profile"
+                onClick={onClose}
+                className="sidebar-profile-card-btn"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>My Profile ({firstName})</span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="sidebar-logout-pill-btn"
+                title="Logout"
+                aria-label="Logout"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              onClick={onClose}
+              className="sidebar-profile-card-btn"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span>Login / Register</span>
+            </Link>
+          )}
+
+          {/* Primary Action CTA Button (Matching Reference "Book Now →" design) */}
+          <Link
+            to="/collections"
+            onClick={onClose}
+            className="sidebar-primary-cta-btn"
+          >
+            <span>Shop Now</span>
+            <span className="cta-arrow">&rarr;</span>
+          </Link>
+        </div>
+      </aside>
     </>
   );
 };

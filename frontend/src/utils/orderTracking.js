@@ -2,28 +2,29 @@
  * Vivisha Boutique - Order Tracking Service / Integration Layer
  * =============================================================
  * 
- * FUTURE INTEGRATION ARCHITECTURE:
- * When a third-party tracking provider (e.g., Shiprocket, Delhivery,
- * India Post, or Blue Dart) is ready to be connected, configure and
- * update the resolveTrackingDestination function below.
+ * THIRD-PARTY COURIER TRACKING ARCHITECTURE:
+ * Order shipment tracking is handled through third-party courier/shipping
+ * tracking websites (e.g., India Post, Shiprocket, Delhivery, Blue Dart).
  * 
- * Flow:
- * Tracking ID -> Third-party tracking URL/API -> Customer tracking page
+ * Once an order is dispatched, the admin team shares the customer's
+ * Tracking ID / Shipment ID along with the courier tracking portal via WhatsApp.
  * 
- * The UI layer calls `resolveTrackingDestination(trackingId)` which handles
- * validation and returns either the external redirect URL or the destination
- * details without needing to redesign any UI components.
+ * Centralized Configuration:
+ * To update or activate a direct third-party tracking portal URL in the future,
+ * configure `THIRD_PARTY_TRACKING_CONFIG` below.
  */
 
-// Configuration for third-party courier providers (to be enabled in future phase)
+// Configuration for third-party courier tracking partner
 export const THIRD_PARTY_TRACKING_CONFIG = {
-  // Provider name placeholder (e.g., 'shiprocket', 'delhivery', 'indiapost', 'bluedart')
-  provider: 'placeholder',
+  // Provider name (e.g., 'Courier Partner', 'India Post', 'Shiprocket', 'Delhivery')
+  providerName: 'Courier Partner',
   
-  // Flag indicating if live third-party integration is active
+  // Flag indicating if direct URL redirection to third-party courier tracking is active
   isLiveIntegrationActive: false,
 
-  // Base URL pattern for courier tracking (e.g., 'https://shiprocket.co/tracking/{TRACKING_ID}')
+  // Configurable third-party tracking URL template (easy to update in one place when final partner URL is confirmed)
+  // Example: 'https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx?id={TRACKING_ID}'
+  // or 'https://shiprocket.co/tracking/{TRACKING_ID}'
   trackingUrlTemplate: null,
 };
 
@@ -75,15 +76,11 @@ export const validateTrackingId = (trackingId) => {
 /**
  * Resolves the tracking destination for the given tracking ID.
  * 
- * For now:
- * Returns temporary placeholder destination metadata for testing the navigation flow.
- * 
- * In future:
- * When live integration is activated, this will construct the third-party courier
- * tracking URL or call the tracking gateway API.
+ * If a live third-party courier tracking URL is configured, it constructs the URL.
+ * Otherwise, it resolves with the verified tracking ID for the third-party courier guidance view.
  * 
  * @param {string} rawTrackingId
- * @returns {{ isValid: boolean, error?: string, trackingId?: string, isTemporarySimulation?: boolean, destinationUrl?: string }}
+ * @returns {{ isValid: boolean, error?: string, trackingId?: string, isThirdPartyRedirect?: boolean, destinationUrl?: string | null }}
  */
 export const resolveTrackingDestination = (rawTrackingId) => {
   const validation = validateTrackingId(rawTrackingId);
@@ -91,23 +88,23 @@ export const resolveTrackingDestination = (rawTrackingId) => {
     return validation;
   }
 
-  // If live integration is active in the future:
+  // If live third-party courier integration is active:
   if (THIRD_PARTY_TRACKING_CONFIG.isLiveIntegrationActive && THIRD_PARTY_TRACKING_CONFIG.trackingUrlTemplate) {
     const url = THIRD_PARTY_TRACKING_CONFIG.trackingUrlTemplate.replace('{TRACKING_ID}', encodeURIComponent(validation.trackingId));
     return {
       isValid: true,
       trackingId: validation.trackingId,
-      isTemporarySimulation: false,
+      isThirdPartyRedirect: true,
       destinationUrl: url
     };
   }
 
-  // Temporary simulation placeholder mode:
+  // Standard third-party courier tracking flow:
   return {
     isValid: true,
     trackingId: validation.trackingId,
-    isTemporarySimulation: true,
-    destinationUrl: null,
-    message: 'Valid tracking ID entered. Demonstrating navigation to temporary tracking destination.'
+    isThirdPartyRedirect: false,
+    destinationUrl: null
   };
 };
+

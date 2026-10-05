@@ -95,6 +95,30 @@ const formatOrderItem = (item) => {
   };
 };
 
+const formatDate = (dateStr, fallback = 'Recent') => {
+  if (!dateStr) return fallback;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
+const getInitials = (name) => {
+  if (!name) return 'VB';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
 const CustomerProfile = ({ defaultTab = 'profile' }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -123,10 +147,14 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
   const [successMsg, setSuccessMsg] = useState('');
 
   const [profileData, setProfileData] = useState({
+    id: user?.id || null,
     fullName: user?.name || '',
     email: user?.email || '',
     mobile: user?.phone || '',
-    dob: ''
+    dob: '',
+    createdAt: null,
+    updatedAt: null,
+    status: 'active'
   });
 
   const [editFormData, setEditFormData] = useState({ ...profileData });
@@ -179,16 +207,12 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
     const paymentStatus = (order.payment?.status || order.payment_status || '').toLowerCase();
     const orderStatus = (order.order_status || '').toLowerCase();
 
-    // 1. Cannot be already refunded (backend rule from backend/api/refunds/refund.php)
     if (paymentStatus === 'refunded' || orderStatus === 'refunded') {
       return false;
     }
-
-    // 2. Payment status must be 'paid' or 'partially_refunded' (backend rule)
     if (paymentStatus !== 'paid' && paymentStatus !== 'partially_refunded') {
       return false;
     }
-
     return true;
   };
 
@@ -224,13 +248,17 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
         });
         const data = await response.json();
 
-        if (data.status) {
+        if (data.status && data.data?.user) {
           const u = data.data.user;
           const pData = {
+            id: u.id || user?.id || null,
             fullName: u.name || '',
             email: u.email || '',
             mobile: u.mobile || '',
-            dob: u.date_of_birth || ''
+            dob: u.date_of_birth || '',
+            createdAt: u.created_at || null,
+            updatedAt: u.updated_at || null,
+            status: u.status || 'active'
           };
           setProfileData(pData);
           setEditFormData(pData);
@@ -313,6 +341,13 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
     navigate('/');
   };
 
+  const handleTabChange = (tab, path) => {
+    setActiveTab(tab);
+    if (path) {
+      navigate(path);
+    }
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -367,7 +402,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       };
 
       if (trimmedEmail) payload.email = trimmedEmail;
-      // Note: date_of_birth is protected by backend and cannot be updated
 
       const response = await fetch(`${API_BASE_URL}/users/update.php`, {
         method: 'PUT',
@@ -382,10 +416,12 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       if (data.status) {
         const u = data.data.user;
         const newProfileData = {
+          ...profileData,
           fullName: u.name || '',
           email: u.email || '',
           mobile: u.mobile || '',
-          dob: u.date_of_birth || ''
+          dob: u.date_of_birth || '',
+          updatedAt: u.updated_at || new Date().toISOString()
         };
         setProfileData(newProfileData);
         setEditFormData(newProfileData);
@@ -469,7 +505,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('Door number must be between 1 and 100 characters.');
       return;
     }
-
     if (!street) {
       setAddressError('Street is required.');
       return;
@@ -478,7 +513,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('Street must be between 2 and 150 characters.');
       return;
     }
-
     if (!area) {
       setAddressError('Area is required.');
       return;
@@ -487,7 +521,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('Area must be between 2 and 150 characters.');
       return;
     }
-
     if (!city) {
       setAddressError('City is required.');
       return;
@@ -496,12 +529,10 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('City must be between 2 and 100 characters.');
       return;
     }
-
     if (district && district.length > 100) {
       setAddressError('District must not exceed 100 characters.');
       return;
     }
-
     if (!state) {
       setAddressError('State is required.');
       return;
@@ -510,7 +541,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('State must be between 2 and 100 characters.');
       return;
     }
-
     if (!pincode) {
       setAddressError('Pincode is required.');
       return;
@@ -519,7 +549,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       setAddressError('Please enter a valid 6-digit Indian pincode.');
       return;
     }
-
     if (landmark && landmark.length > 150) {
       setAddressError('Landmark must not exceed 150 characters.');
       return;
@@ -652,20 +681,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
     }
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'confirmed':
-      case 'delivered':
-        return 'badge-success';
-      case 'shipped':
-        return 'badge-info';
-      case 'cancelled':
-        return 'badge-danger';
-      default:
-        return 'badge-warning';
-    }
-  };
-
   const getStatusBadgeStyle = (status) => {
     switch (status) {
       case 'confirmed':
@@ -684,92 +699,34 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
     }
   };
 
-  const avatarInitial = (profileData.fullName || user?.name || 'U').charAt(0).toUpperCase();
-  const firstName = (profileData.fullName || user?.name || 'Customer').split(' ')[0];
+  const userInitials = getInitials(profileData.fullName || user?.name || 'Customer');
 
-  const accountMenuItems = [
-    {
-      label: 'Personal Information',
-      subtitle: 'Edit your name, phone, email & birthday',
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-      ),
-      path: '/profile',
-      active: activeTab === 'profile'
-    },
-    {
-      label: 'My Orders & Tracking',
-      subtitle: `${orders.length} order${orders.length === 1 ? '' : 's'} placed`,
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-        </svg>
-      ),
-      path: '/orders',
-      active: activeTab === 'orders' || activeTab === 'track'
-    },
-    {
-      label: 'Saved Addresses',
-      subtitle: `${savedAddresses.length} delivery address${savedAddresses.length === 1 ? '' : 'es'} saved`,
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3"></circle>
-        </svg>
-      ),
-      path: '/addresses',
-      active: activeTab === 'addresses'
-    },
-    {
-      label: 'My Wishlist',
-      subtitle: 'View your saved favorite pieces',
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-        </svg>
-      ),
-      path: '/wishlist',
-      hasArrow: true
-    },
-    {
-      label: 'Shopping Cart',
-      subtitle: 'Review items in your bag',
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="9" cy="21" r="1"></circle>
-          <circle cx="20" cy="21" r="1"></circle>
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-        </svg>
-      ),
-      path: '/cart',
-      hasArrow: true
-    }
-  ];
-
-  // Render Saved Addresses Block
+  // Render Saved Addresses View
   const renderSavedAddressesView = () => (
-    <div className="profile-section-block">
-      <div className="section-block-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div>
-          <h3 className="section-block-title" style={{ margin: 0 }}>Saved Delivery Addresses</h3>
-          <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
-            Manage and set your primary shipping destinations
-          </p>
+    <div className="vivisha-profile-content-card">
+      <div className="profile-card-header-row">
+        <div className="profile-card-header-left">
+          <div className="profile-card-header-icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <h3 className="profile-card-title">Saved Delivery Addresses</h3>
+            <p className="profile-card-desc">Manage and set your primary shipping destinations</p>
+          </div>
         </div>
         <button
           type="button"
-          className="btn-add-address-action"
+          className="btn-profile-primary-action"
           onClick={handleOpenAddNewAddress}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          Add New Address
+          <span>Add New Address</span>
         </button>
       </div>
 
@@ -777,168 +734,93 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       {addressError && <div className="profile-toast profile-toast-error">{addressError}</div>}
 
       {isAddressLoading ? (
-        <div style={{ textAlign: 'center', padding: '30px', color: '#6b7280' }}>Loading addresses...</div>
+        <div className="profile-loading-state">
+          <div className="spinner"></div>
+          <p>Loading addresses...</p>
+        </div>
       ) : savedAddresses.length === 0 ? (
-        <div className="empty-address-box">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
+        <div className="profile-empty-state">
+          <div className="empty-icon-circle">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+          </div>
           <h4>No Addresses Saved</h4>
-          <p>Add a delivery address to speed up your checkout process.</p>
+          <p>Add a delivery address to enjoy seamless checkout on future purchases.</p>
           <button
             type="button"
-            className="btn-add-address-empty"
+            className="btn-profile-primary-action"
             onClick={handleOpenAddNewAddress}
           >
             + Add First Address
           </button>
         </div>
       ) : (
-        <div className="addresses-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+        <div className="addresses-grid-layout">
           {savedAddresses.map((addr) => (
             <div
               key={addr.id}
-              className={`address-card ${addr.is_default === 1 ? 'is-default' : ''}`}
-              style={{
-                background: addr.is_default === 1 ? '#fdfafd' : '#ffffff',
-                border: addr.is_default === 1 ? '1.5px solid var(--primary-color, #6b21a8)' : '1px solid #ebd7ed',
-                borderRadius: '16px',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '18px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-              }}
+              className={`vivisha-address-box ${addr.is_default === 1 ? 'is-default' : ''}`}
             >
-              <div className="address-card-top" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                <span className="address-type-badge" style={{
-                  background: '#F6EDF6',
-                  color: 'var(--primary-color, #6b21a8)',
-                  fontSize: '0.74rem',
-                  fontWeight: '700',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  letterSpacing: '0.05em'
-                }}>
+              <div className="address-box-top">
+                <span className="address-type-pill">
                   {(addr.address_type || 'home').toUpperCase()}
                 </span>
                 {addr.is_default === 1 && (
-                  <span className="default-address-badge" style={{
-                    background: '#ecfdf5',
-                    color: '#059669',
-                    border: '1px solid #a7f3d0',
-                    fontSize: '0.74rem',
-                    fontWeight: '700',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    letterSpacing: '0.05em'
-                  }}>
-                    DEFAULT
+                  <span className="address-default-pill">
+                    <span className="dot"></span> DEFAULT
                   </span>
                 )}
               </div>
 
-              <div className="address-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h4 className="address-card-name" style={{ fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: '0 0 2px 0' }}>
+              <div className="address-box-body">
+                <h4 className="address-recipient-name">
                   {addr.user_name || profileData.fullName}
                 </h4>
 
-                <div style={{ color: '#374151', fontSize: '0.92rem', lineHeight: '1.65', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="address-lines">
                   <div>{addr.door_no}, {addr.street}</div>
                   <div>{addr.area}, {addr.city}{addr.district ? `, ${addr.district}` : ''}</div>
-                  <div>{addr.state} — <strong style={{ color: '#111827' }}>{addr.pincode}</strong></div>
+                  <div>{addr.state} — <strong>{addr.pincode}</strong></div>
                 </div>
 
                 {addr.landmark && (
-                  <div style={{
-                    fontSize: '0.84rem',
-                    color: '#6b7280',
-                    background: '#f9fafb',
-                    border: '1px solid #f3f4f6',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    marginTop: '4px',
-                    lineHeight: '1.5'
-                  }}>
-                    <strong style={{ color: '#4b5563' }}>Landmark:</strong> {addr.landmark}
+                  <div className="address-landmark-tag">
+                    <strong>Landmark:</strong> {addr.landmark}
                   </div>
                 )}
 
-                <div style={{
-                  fontSize: '0.88rem',
-                  color: '#111827',
-                  marginTop: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.82rem' }}>Phone:</span>
-                  <strong style={{ letterSpacing: '0.02em' }}>+{addr.user_mobile || profileData.mobile}</strong>
+                <div className="address-phone-row">
+                  <span className="label">Phone:</span>
+                  <span className="value">+{addr.user_mobile || profileData.mobile}</span>
                 </div>
               </div>
 
-              <div className="address-card-actions" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                borderTop: '1px solid #f3e8f3',
-                paddingTop: '16px',
-                flexWrap: 'wrap'
-              }}>
+              <div className="address-box-footer">
                 <button
                   type="button"
-                  className="btn-address-edit"
+                  className="btn-addr-edit"
                   onClick={(e) => handleEditAddress(addr, e)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.84rem',
-                    fontWeight: '600'
-                  }}
                 >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                   </svg>
-                  Edit
+                  <span>Edit</span>
                 </button>
                 {addr.is_default !== 1 && (
                   <button
                     type="button"
-                    className="btn-address-default"
+                    className="btn-addr-set-default"
                     onClick={() => handleSelectDefaultAddress(addr.id)}
-                    style={{
-                      padding: '7px 16px',
-                      borderRadius: '8px',
-                      fontSize: '0.84rem',
-                      fontWeight: '600'
-                    }}
                   >
                     Set as Default
                   </button>
                 )}
                 <button
                   type="button"
-                  className="btn-address-delete"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#dc2626',
-                    fontSize: '0.84rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    marginLeft: 'auto'
-                  }}
+                  className="btn-addr-delete"
                   onClick={(e) => handleDeleteAddress(addr.id, e)}
                   title="Remove address"
                 >
@@ -946,7 +828,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                   </svg>
-                  Remove
+                  <span>Remove</span>
                 </button>
               </div>
             </div>
@@ -958,34 +840,29 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
 
   // Render Orders View
   const renderOrdersView = () => (
-    <div className="profile-section-block">
-      <div className="section-block-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h3 className="section-block-title" style={{ margin: 0 }}>My Orders & Tracking</h3>
-          <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
-            Track deliveries, view past orders and invoices
-          </p>
+    <div className="vivisha-profile-content-card">
+      <div className="profile-card-header-row flex-wrap">
+        <div className="profile-card-header-left">
+          <div className="profile-card-header-icon-box">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 className="profile-card-title">My Orders & Tracking</h3>
+            <p className="profile-card-desc">Track deliveries, past orders and view tax invoices</p>
+          </div>
         </div>
 
         {/* Filter Pills */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="orders-filter-pill-group">
           {['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map((status) => (
             <button
               key={status}
               type="button"
+              className={`order-filter-pill ${orderFilterStatus === status ? 'active' : ''}`}
               onClick={() => setOrderFilterStatus(status)}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                border: '1px solid',
-                borderColor: orderFilterStatus === status ? 'var(--primary-color, #6b21a8)' : '#e5e7eb',
-                background: orderFilterStatus === status ? 'var(--primary-color, #6b21a8)' : '#fff',
-                color: orderFilterStatus === status ? '#fff' : '#4b5563',
-                cursor: 'pointer',
-                textTransform: 'capitalize'
-              }}
             >
               {status}
             </button>
@@ -993,35 +870,10 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
         </div>
       </div>
 
-      {/* Quick Courier Tracking Banner */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #FDF7FD 0%, #F8EEF8 100%)',
-          border: '1px solid #e9d5eb',
-          borderRadius: '12px',
-          padding: '14px 18px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'var(--primary-color, #A049A3)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
+      {/* Courier Tracking Quick Banner */}
+      <div className="orders-courier-track-banner">
+        <div className="banner-left-info">
+          <div className="banner-icon-badge">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="1" y="3" width="15" height="13"></rect>
               <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
@@ -1030,30 +882,12 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
             </svg>
           </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.92rem', color: '#1f2937', fontWeight: '600' }}>
-              Have a Tracking ID from WhatsApp?
-            </h4>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
-              Track shipment progress instantly using the unique ID shared by our team.
-            </p>
+            <h4>Have a Tracking ID from WhatsApp?</h4>
+            <p>Track live delivery progress on the courier portal with your consignment number.</p>
           </div>
         </div>
 
-        <Link
-          to="/track-order"
-          style={{
-            background: 'var(--primary-color, #A049A3)',
-            color: '#ffffff',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            fontSize: '0.85rem',
-            fontWeight: '600',
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
+        <Link to="/track-order" className="btn-banner-track">
           <span>Track Order</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1063,74 +897,46 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
       </div>
 
       {isOrdersLoading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-          <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
-          Loading orders...
+        <div className="profile-loading-state">
+          <div className="spinner"></div>
+          <p>Loading your orders...</p>
         </div>
       ) : orders.length === 0 ? (
-        <div className="empty-address-box" style={{ padding: '40px 20px', textAlign: 'center' }}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-          </svg>
-          <h4 style={{ margin: '12px 0 6px 0', fontSize: '1.1rem' }}>No Orders Found</h4>
-          <p style={{ color: '#6b7280', margin: '0 0 16px 0', fontSize: '0.9rem' }}>
-            {orderFilterStatus !== 'all' ? `No ${orderFilterStatus} orders found.` : "You haven't placed any orders yet."}
-          </p>
-          <Link to="/collections" className="btn-primary-cart" style={{ display: 'inline-block', textDecoration: 'none' }}>
+        <div className="profile-empty-state">
+          <div className="empty-icon-circle">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+          </div>
+          <h4>No Orders Found</h4>
+          <p>{orderFilterStatus !== 'all' ? `No ${orderFilterStatus} orders found.` : "You haven't placed any orders yet."}</p>
+          <Link to="/collections" className="btn-profile-primary-action" style={{ textDecoration: 'none' }}>
             Explore Boutique Collections
           </Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="orders-card-list">
           {orders.map((order) => (
-            <div
-              key={order.id}
-              style={{
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'box-shadow 0.2s ease'
-              }}
-            >
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                borderBottom: '1px solid #f3f4f6',
-                paddingBottom: '14px',
-                marginBottom: '14px',
-                flexWrap: 'wrap',
-                gap: '10px'
-              }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: '800', fontSize: '1.05rem', color: 'var(--primary-color, #6b21a8)' }}>
-                      #{order.order_number}
-                    </span>
-                    <span style={{
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
-                      fontWeight: '700',
-                      textTransform: 'uppercase',
-                      ...getStatusBadgeStyle(order.order_status)
-                    }}>
+            <div key={order.id} className="order-summary-card-box">
+              <div className="order-card-header-bar">
+                <div className="order-header-meta">
+                  <div className="order-number-row">
+                    <span className="order-number-tag">#{order.order_number}</span>
+                    <span className="order-status-badge" style={getStatusBadgeStyle(order.order_status)}>
                       {order.order_status}
                     </span>
                   </div>
-                  <span style={{ color: '#6b7280', fontSize: '0.8rem', display: 'block', marginTop: '4px' }}>
-                    Placed on {order.placed_at || order.created_at ? new Date(order.placed_at || order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}
+                  <span className="order-placed-date">
+                    Placed on {order.placed_at || order.created_at ? formatDate(order.placed_at || order.created_at) : 'Recent'}
                   </span>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#111827', display: 'block' }}>
+                <div className="order-header-pricing">
+                  <span className="order-total-amount">
                     ₹{parseFloat(order.grand_total || order.amounts?.grand_total || 0).toLocaleString('en-IN')}.00
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase' }}>
+                  <span className="order-payment-method-tag">
                     {order.payment_method ? (order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method.toUpperCase()) : 'Payment Pending'}
                   </span>
                 </div>
@@ -1138,28 +944,14 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
 
               {/* Items Preview */}
               {order.items && order.items.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                <div className="order-items-preview-stack">
                   {order.items.map((rawItem, idx) => {
                     const item = formatOrderItem(rawItem);
                     return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '6px',
-                          background: '#f3f4f6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          flexShrink: 0
-                        }}>
+                      <div key={idx} className="order-item-row-block">
+                        <div className="order-item-thumb">
                           {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.productName}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
+                            <img src={item.imageUrl} alt={item.productName} />
                           ) : (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -1168,11 +960,9 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                             </svg>
                           )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h5 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600', color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {item.productName}
-                          </h5>
-                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                        <div className="order-item-details">
+                          <h5 className="order-item-name">{item.productName}</h5>
+                          <p className="order-item-meta">
                             {[
                               item.variantName ? item.variantName : null,
                               item.sizeName ? `Size: ${item.sizeName}` : null,
@@ -1182,7 +972,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                             Qty: {item.quantity} × ₹{item.sellingPrice.toFixed(2)}
                           </p>
                         </div>
-                        <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#374151' }}>
+                        <span className="order-item-line-total">
                           ₹{item.lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -1191,41 +981,19 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                 </div>
               )}
 
-              {/* Order Footer Actions */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f3f4f6', paddingTop: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', color: '#4b5563' }}>
-                  {order.address?.city ? `Shipping to: ${order.address.city}, ${order.address.state}` : 'Delivery Address Assigned'}
+              {/* Footer Actions */}
+              <div className="order-card-footer-bar">
+                <span className="order-shipping-dest">
+                  {order.address?.city ? `Shipping to: ${order.address.city}, ${order.address.state}` : 'Delivery destination confirmed'}
                 </span>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {/* Order Tracking Button */}
+                <div className="order-action-btn-group">
                   <button
                     type="button"
+                    className="btn-order-track-portal"
                     onClick={() => {
                       window.open('https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx', '_blank', 'noopener,noreferrer');
                     }}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #7dd3fc',
-                      color: '#0369a1',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#f0f9ff';
-                      e.currentTarget.style.borderColor = '#0369a1';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.borderColor = '#7dd3fc';
-                    }}
-                    title="Track your order on the courier website using your Tracking ID (shared via WhatsApp)"
+                    title="Track consignment with your tracking code"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="1" y="3" width="15" height="13"></rect>
@@ -1233,24 +1001,15 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                       <circle cx="5.5" cy="18.5" r="2.5"></circle>
                       <circle cx="18.5" cy="18.5" r="2.5"></circle>
                     </svg>
-                    Track Order
+                    <span>Track Shipment</span>
                   </button>
 
                   <button
                     type="button"
+                    className="btn-order-details-view"
                     onClick={() => handleOpenOrderDetails(order.id)}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid var(--primary-color, #6b21a8)',
-                      color: 'var(--primary-color, #6b21a8)',
-                      padding: '6px 14px',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
                   >
-                    View Details & Invoice →
+                    <span>View Invoice & Details →</span>
                   </button>
                 </div>
               </div>
@@ -1262,367 +1021,399 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
   );
 
   return (
-    <div className="customer-profile-page container">
+    <div className="vivisha-profile-page-wrapper">
+      {/* ============================================================ */}
+      {/* TOP HERO BANNER (Matches Reference Style & Vivisha Palette)   */}
+      {/* ============================================================ */}
+      <section className="profile-hero-banner-section">
+        <div className="profile-hero-inner container">
+          <h1 className="profile-hero-title">My Profile & Account</h1>
+          <p className="profile-hero-subtitle">
+            Manage your customer account details and explore your Vivisha Boutique privileges.
+          </p>
 
-      {/* ========== MOBILE ACCOUNT HUB (Card-based navigation) ========== */}
-      <div className="mobile-account-hub">
-        {/* User Identity Card */}
-        <div className="mobile-account-user-card">
-          <div className="mobile-account-avatar">{avatarInitial}</div>
-          <div className="mobile-account-user-info">
-            <h2 className="mobile-account-name">Hello, {firstName}</h2>
-            <p className="mobile-account-email">{profileData.email || profileData.mobile}</p>
+          {/* Tab Navigation Pill Bar */}
+          <div className="profile-hero-tab-bar">
+            <button
+              type="button"
+              className={`hero-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => handleTabChange('profile', '/profile')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span>Account Info</span>
+            </button>
+            <button
+              type="button"
+              className={`hero-tab-btn ${activeTab === 'orders' || activeTab === 'track' ? 'active' : ''}`}
+              onClick={() => handleTabChange('orders', '/orders')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+              <span>My Orders ({orders.length})</span>
+            </button>
+            <button
+              type="button"
+              className={`hero-tab-btn ${activeTab === 'addresses' ? 'active' : ''}`}
+              onClick={() => handleTabChange('addresses', '/addresses')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              <span>Delivery Addresses ({savedAddresses.length})</span>
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Quick Navigation Cards */}
-        <div className="mobile-account-menu-list">
-          {accountMenuItems.map((item) => {
-            const isTabAction = item.path === '/profile' || item.path === '/addresses' || item.path === '/orders';
-            const content = (
-              <div className={`mobile-account-menu-item ${item.active ? 'current' : ''}`}>
-                <div className="mobile-account-menu-icon">{item.icon}</div>
-                <div className="mobile-account-menu-text">
-                  <span className="mobile-account-menu-label">{item.label}</span>
-                  <span className="mobile-account-menu-subtitle">{item.subtitle}</span>
-                </div>
-                {item.hasArrow && (
-                  <svg className="mobile-account-menu-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                )}
-              </div>
-            );
-
-            if (isTabAction) {
-              return (
-                <div
-                  key={item.path}
-                  onClick={() => {
-                    if (item.path === '/profile') setActiveTab('profile');
-                    if (item.path === '/addresses') setActiveTab('addresses');
-                    if (item.path === '/orders') setActiveTab('orders');
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {content}
-                </div>
-              );
-            }
-
-            return (
-              <Link key={item.path} to={item.path} style={{ textDecoration: 'none' }}>
-                {content}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Logout */}
-        <button className="mobile-account-logout-btn" onClick={handleLogout}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
-          </svg>
-          <span>Logout</span>
-        </button>
-
-        {/* Mobile Active Tab Content */}
-        {activeTab === 'addresses' ? (
-          renderSavedAddressesView()
-        ) : activeTab === 'orders' || activeTab === 'track' ? (
-          renderOrdersView()
-        ) : (
-          <div className="mobile-profile-section">
-            <div className="mobile-profile-section-header">
-              <h3>Personal Information</h3>
-              {!isEditingProfile && (
-                <button
-                  className="btn-edit-inline"
-                  onClick={() => {
-                    setEditFormData(profileData);
-                    setIsEditingProfile(true);
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                  </svg>
-                  Edit
-                </button>
-              )}
-            </div>
-
-            {successMsg && <div className="profile-toast profile-toast-success">{successMsg}</div>}
-            {errorMsg && <div className="profile-toast profile-toast-error">{errorMsg}</div>}
-
-            {isEditingProfile ? (
-              <form className="profile-edit-form" onSubmit={handleUpdateProfile}>
-                <div className="form-group">
-                  <label>Full Name</label>
-                  <input
-                    type="text"
-                    value={editFormData.fullName}
-                    onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email Address</label>
-                  <input
-                    type="email"
-                    value={editFormData.email}
-                    onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mobile Number</label>
-                  <input
-                    type="tel"
-                    value={editFormData.mobile}
-                    onChange={(e) => setEditFormData({...editFormData, mobile: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Date of Birth</label>
-                  <input
-                    type="date"
-                    value={editFormData.dob}
-                    disabled
-                    readOnly
-                    title="Date of birth cannot be changed"
-                    style={{ background: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }}
-                  />
-                  <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '3px', display: 'block' }}>
-                    Date of birth cannot be changed.
-                  </span>
-                </div>
-                <div className="form-action-row">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => setIsEditingProfile(false)}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn-save" disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="info-display-grid">
-                <div className="info-display-item">
-                  <span className="info-label">Full Name</span>
-                  <span className="info-value">{profileData.fullName}</span>
-                </div>
-                <div className="info-display-item">
-                  <span className="info-label">Email</span>
-                  <span className="info-value">{profileData.email || 'Not provided'}</span>
-                </div>
-                <div className="info-display-item">
-                  <span className="info-label">Mobile</span>
-                  <span className="info-value">{profileData.mobile}</span>
-                </div>
-                <div className="info-display-item">
-                  <span className="info-label">Date of Birth</span>
-                  <span className="info-value">{profileData.dob || 'Not provided'}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ========== DESKTOP PROFILE VIEW ========== */}
-      <div className="desktop-profile-view">
+      {/* ============================================================ */}
+      {/* MAIN DASHBOARD CONTENT AREA                                  */}
+      {/* ============================================================ */}
+      <main className="profile-dashboard-content-area container">
         {successMsg && <div className="profile-toast profile-toast-success">{successMsg}</div>}
         {errorMsg && <div className="profile-toast profile-toast-error">{errorMsg}</div>}
 
-        {/* Tab Navigation for Desktop */}
-        <div className="desktop-account-tab-nav">
-          <button
-            className={`desktop-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('profile');
-              navigate('/profile');
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            Personal Info
-          </button>
-          <button
-            className={`desktop-tab-btn ${activeTab === 'orders' || activeTab === 'track' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('orders');
-              navigate('/orders');
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-            </svg>
-            My Orders ({orders.length})
-          </button>
-          <button
-            className={`desktop-tab-btn ${activeTab === 'addresses' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('addresses');
-              navigate('/addresses');
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            Saved Addresses ({savedAddresses.length})
-          </button>
-        </div>
-
-        {activeTab === 'addresses' ? (
-          renderSavedAddressesView()
-        ) : activeTab === 'orders' || activeTab === 'track' ? (
-          renderOrdersView()
-        ) : (
-          <>
-            {/* Header Title Section */}
-            <div className="profile-page-header">
-              <h1 className="profile-main-title">My Profile</h1>
-              <p className="profile-main-subtitle">
-                Manage your personal information and account preferences.
-              </p>
+        <div className="profile-dashboard-grid-layout">
+          {/* ======================================================== */}
+          {/* LEFT COLUMN: Profile Summary Card (Matching Reference UI) */}
+          {/* ======================================================== */}
+          <aside className="profile-summary-sidebar-card">
+            {/* User Avatar Circle with Online/Verified Indicator Dot */}
+            <div className="profile-avatar-holder">
+              <div className="profile-avatar-circle">
+                {userInitials}
+              </div>
+              <span className="profile-status-indicator" title="Active & Verified Account"></span>
             </div>
 
-            {/* Profile Summary Card */}
-            <div className="profile-summary-card">
-              <div className="profile-avatar-wrapper">
-                <div className="profile-large-avatar">{avatarInitial}</div>
+            {/* Name & Contact */}
+            <h2 className="profile-user-display-name">
+              {profileData.fullName || user?.name || 'Customer'}
+            </h2>
+            <p className="profile-user-display-email">
+              {profileData.email || profileData.mobile || 'customer@vivishaboutique.com'}
+            </p>
+
+            {/* Badges / Status Pills */}
+            <div className="profile-badges-row">
+              <span className="profile-tag-pill role">Customer Account</span>
+              <span className="profile-tag-pill active">
+                <span className="dot"></span> Active Member
+              </span>
+            </div>
+
+            {/* Key Account Metadata Box */}
+            <div className="profile-meta-info-box">
+              <div className="meta-info-row">
+                <span className="meta-label">Customer ID</span>
+                <span className="meta-value">#{profileData.id || user?.id || '2'}</span>
               </div>
-              <div className="profile-summary-info">
-                <h2 className="summary-name">{profileData.fullName}</h2>
-                <p className="summary-detail">{profileData.email}</p>
-                <p className="summary-detail">{profileData.mobile}</p>
-              </div>
-              <div className="profile-summary-action">
-                {!isEditingProfile && (
-                  <button
-                    type="button"
-                    className="btn-edit-profile-action"
-                    onClick={() => {
-                      setEditFormData(profileData);
-                      setIsEditingProfile(true);
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    Edit Profile
-                  </button>
-                )}
+              <div className="meta-info-row">
+                <span className="meta-label">Member Since</span>
+                <span className="meta-value">
+                  {formatDate(profileData.createdAt, '29 September 2026')}
+                </span>
               </div>
             </div>
 
-            {/* Personal Information */}
-            <div className="profile-section-block">
-              <div className="section-block-header">
-                <h3 className="section-block-title">Personal Information</h3>
-              </div>
+            {/* Log Out Account Button (Soft Red Button) */}
+            <button
+              type="button"
+              className="btn-profile-logout-pill"
+              onClick={handleLogout}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              <span>Log Out Account</span>
+            </button>
+          </aside>
 
-              <div className="profile-info-card">
-                {isEditingProfile ? (
-                  <form className="profile-edit-form" onSubmit={handleUpdateProfile}>
-                    <div className="form-grid-2col">
-                      <div className="form-group">
-                        <label>Full Name</label>
-                        <input
-                          type="text"
-                          value={editFormData.fullName}
-                          onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})}
-                          required
-                        />
+          {/* ======================================================== */}
+          {/* RIGHT COLUMN: Tab Content Blocks                         */}
+          {/* ======================================================== */}
+          <div className="profile-main-content-column">
+            {activeTab === 'addresses' ? (
+              renderSavedAddressesView()
+            ) : activeTab === 'orders' || activeTab === 'track' ? (
+              renderOrdersView()
+            ) : (
+              <>
+                {/* ---------------------------------------------------- */}
+                {/* CARD 1: Verified Account Information                 */}
+                {/* ---------------------------------------------------- */}
+                <section className="vivisha-profile-content-card">
+                  <div className="profile-card-header-row">
+                    <div className="profile-card-header-left">
+                      <div className="profile-card-header-icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
                       </div>
-                      <div className="form-group">
-                        <label>Email Address</label>
-                        <input
-                          type="email"
-                          value={editFormData.email}
-                          onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                        />
+                      <div>
+                        <h3 className="profile-card-title">Verified Account Information</h3>
+                        <p className="profile-card-desc">Your personal contact details & account profile</p>
                       </div>
-                      <div className="form-group">
-                        <label>Mobile Number</label>
-                        <input
-                          type="tel"
-                          value={editFormData.mobile}
-                          onChange={(e) => setEditFormData({...editFormData, mobile: e.target.value})}
-                          required
-                        />
+                    </div>
+
+                    {!isEditingProfile ? (
+                      <button
+                        type="button"
+                        className="btn-profile-action-outline"
+                        onClick={() => {
+                          setEditFormData(profileData);
+                          setIsEditingProfile(true);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Edit Details</span>
+                      </button>
+                    ) : (
+                      <span className="profile-view-only-badge">EDITING</span>
+                    )}
+                  </div>
+
+                  {/* Account Information Display / Edit Form */}
+                  {isEditingProfile ? (
+                    <form className="profile-inline-edit-form" onSubmit={handleUpdateProfile}>
+                      <div className="form-grid-2col">
+                        <div className="profile-form-group">
+                          <label>Full Name *</label>
+                          <input
+                            type="text"
+                            value={editFormData.fullName}
+                            onChange={(e) => setEditFormData({ ...editFormData, fullName: e.target.value })}
+                            placeholder="Enter full name"
+                            required
+                          />
+                        </div>
+                        <div className="profile-form-group">
+                          <label>Email Address</label>
+                          <input
+                            type="email"
+                            value={editFormData.email}
+                            onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                            placeholder="your.email@example.com"
+                          />
+                        </div>
+                        <div className="profile-form-group">
+                          <label>Mobile Number *</label>
+                          <input
+                            type="tel"
+                            value={editFormData.mobile}
+                            onChange={(e) => setEditFormData({ ...editFormData, mobile: e.target.value })}
+                            placeholder="10-digit mobile number"
+                            required
+                          />
+                        </div>
+                        <div className="profile-form-group">
+                          <label>Date of Birth</label>
+                          <input
+                            type="date"
+                            value={editFormData.dob}
+                            disabled
+                            readOnly
+                            title="Date of birth is fixed and cannot be changed"
+                            className="input-disabled"
+                          />
+                          <span className="input-hint">Date of birth cannot be changed.</span>
+                        </div>
                       </div>
-                      <div className="form-group">
-                        <label>Date of Birth</label>
-                        <input
-                          type="date"
-                          value={editFormData.dob}
-                          disabled
-                          readOnly
-                          title="Date of birth cannot be changed"
-                          style={{ background: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '3px', display: 'block' }}>
-                          Date of birth cannot be changed.
+
+                      <div className="profile-form-actions-row">
+                        <button
+                          type="button"
+                          className="btn-profile-form-cancel"
+                          onClick={() => setIsEditingProfile(false)}
+                          disabled={isSaving}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn-profile-form-save"
+                          disabled={isSaving}
+                        >
+                          {isSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="profile-info-tiles-grid">
+                      {/* Tile 1: Full Name */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">FULL NAME</span>
+                        <span className="tile-value">{profileData.fullName || 'Customer'}</span>
+                      </div>
+
+                      {/* Tile 2: Email Address */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">EMAIL ADDRESS</span>
+                        <span className="tile-value text-break">
+                          {profileData.email || 'Not provided'}
+                        </span>
+                      </div>
+
+                      {/* Tile 3: Phone Number */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">PHONE NUMBER</span>
+                        <span className="tile-value">
+                          {profileData.mobile ? `+91 ${profileData.mobile}` : 'Not provided'}
+                        </span>
+                      </div>
+
+                      {/* Tile 4: Account Role */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">ACCOUNT ROLE</span>
+                        <span className="tile-value">Customer</span>
+                      </div>
+
+                      {/* Tile 5: Registration Date */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">REGISTRATION DATE</span>
+                        <span className="tile-value">
+                          {formatDate(profileData.createdAt, '29 September 2026')}
+                        </span>
+                      </div>
+
+                      {/* Tile 6: Last Updated */}
+                      <div className="profile-info-tile">
+                        <span className="tile-label">LAST UPDATED</span>
+                        <span className="tile-value">
+                          {formatDate(profileData.updatedAt || profileData.createdAt, '2 October 2026')}
                         </span>
                       </div>
                     </div>
-                    <div className="form-action-row">
-                      <button
-                        type="button"
-                        className="btn-cancel"
-                        onClick={() => setIsEditingProfile(false)}
-                        disabled={isSaving}
-                      >
-                        Cancel
-                      </button>
-                      <button type="submit" className="btn-save" disabled={isSaving}>
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="info-display-grid">
-                    <div className="info-display-item">
-                      <span className="info-label">Full Name</span>
-                      <span className="info-value">{profileData.fullName}</span>
-                    </div>
-                    <div className="info-display-item">
-                      <span className="info-label">Email Address</span>
-                      <span className="info-value">
-                        {profileData.email ? <a href={`mailto:${profileData.email}`}>{profileData.email}</a> : 'Not provided'}
-                      </span>
-                    </div>
-                    <div className="info-display-item">
-                      <span className="info-label">Mobile Number</span>
-                      <span className="info-value">{profileData.mobile}</span>
-                    </div>
-                    <div className="info-display-item">
-                      <span className="info-label">Date of Birth</span>
-                      <span className="info-value">{profileData.dob || 'Not provided'}</span>
+                  )}
+                </section>
+
+                {/* ---------------------------------------------------- */}
+                {/* CARD 2: Vivisha Boutique Services & Activity Hub     */}
+                {/* ---------------------------------------------------- */}
+                <section className="vivisha-profile-content-card">
+                  <div className="profile-card-header-row">
+                    <div className="profile-card-header-left">
+                      <div className="profile-card-header-icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="profile-card-title">Vivisha Boutique Services & Activity</h3>
+                        <p className="profile-card-desc">
+                          Ready for your next style upgrade? Explore our exclusive collections, track your orders, manage delivery addresses, and connect with customer care.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
 
-      {/* ========== ORDER DETAILS MODAL / DRAWER ========== */}
+                  {/* 2x2 Interactive Services Shortcuts Grid */}
+                  <div className="services-action-grid">
+                    {/* Action 1: Orders & Tracking */}
+                    <div
+                      className="service-action-card"
+                      onClick={() => handleTabChange('orders', '/orders')}
+                    >
+                      <div className="service-card-icon-circle">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                      </div>
+                      <div className="service-card-info">
+                        <h4 className="service-card-title">My Orders & History</h4>
+                        <p className="service-card-subtitle">
+                          {orders.length > 0 ? `${orders.length} order${orders.length === 1 ? '' : 's'} placed • Track status` : 'View past purchases & track delivery'}
+                        </p>
+                      </div>
+                      <span className="service-card-chevron">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </div>
+
+                    {/* Action 2: Delivery Addresses */}
+                    <div
+                      className="service-action-card"
+                      onClick={() => handleTabChange('addresses', '/addresses')}
+                    >
+                      <div className="service-card-icon-circle">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                          <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                      </div>
+                      <div className="service-card-info">
+                        <h4 className="service-card-title">Delivery Addresses</h4>
+                        <p className="service-card-subtitle">
+                          {savedAddresses.length > 0 ? `${savedAddresses.length} saved destination${savedAddresses.length === 1 ? '' : 's'}` : 'Manage shipping destinations'}
+                        </p>
+                      </div>
+                      <span className="service-card-chevron">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </div>
+
+                    {/* Action 3: Wishlist */}
+                    <Link to="/wishlist" className="service-action-card">
+                      <div className="service-card-icon-circle">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                      </div>
+                      <div className="service-card-info">
+                        <h4 className="service-card-title">Saved Wishlist</h4>
+                        <p className="service-card-subtitle">Explore your saved favorite styles</p>
+                      </div>
+                      <span className="service-card-chevron">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </Link>
+
+                    {/* Action 4: Concierge & Support */}
+                    <Link to="/contact" className="service-action-card">
+                      <div className="service-card-icon-circle">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                      </div>
+                      <div className="service-card-info">
+                        <h4 className="service-card-title">Help & Support Desk</h4>
+                        <p className="service-card-subtitle">Reach our boutique concierge team</p>
+                      </div>
+                      <span className="service-card-chevron">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </Link>
+                  </div>
+                </section>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* ============================================================ */}
+      {/* ORDER DETAILS MODAL / DRAWER                                 */}
+      {/* ============================================================ */}
       {isOrderModalOpen && (
         <div
           className="address-drawer-overlay open"
@@ -1667,7 +1458,7 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                     <span style={{ fontSize: '0.8rem' }}>Payment: {selectedOrderDetails.payment?.status || selectedOrderDetails.payment_status}</span>
                   </div>
 
-                  {/* Refund Notice / Status if applicable */}
+                  {/* Refund Notice */}
                   {(selectedOrderDetails.order_status === 'refunded' || selectedOrderDetails.payment?.status === 'refunded' || selectedOrderDetails.payment_status === 'refunded') && (
                     <div style={{
                       background: '#f3e8ff',
@@ -1795,11 +1586,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                                 {item.variantName || item.sizeName || item.colorName ? ' • ' : ''}
                                 Qty: {item.quantity} × ₹{item.sellingPrice.toFixed(2)}
                               </p>
-                              {item.gstRate > 0 && (
-                                <p style={{ margin: '2px 0 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
-                                  GST: {item.gstRate}% {item.cgstAmount > 0 ? `(CGST ₹${item.cgstAmount.toFixed(2)} + SGST ₹${item.sgstAmount.toFixed(2)})` : `(IGST ₹${(item.igstAmount || item.taxAmount).toFixed(2)})`}
-                                </p>
-                              )}
                             </div>
                             <strong style={{ fontSize: '0.9rem' }}>₹{item.lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
                           </div>
@@ -1894,14 +1680,6 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
                     gap: '6px',
                     transition: 'all 0.2s ease'
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--primary-color, #A049A3)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#faf5fa';
-                    e.currentTarget.style.color = 'var(--primary-color, #A049A3)';
-                  }}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -1923,7 +1701,9 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
         </div>
       )}
 
-      {/* ========== REUSABLE ADDRESS SIDE DRAWER ========== */}
+      {/* ============================================================ */}
+      {/* REUSABLE ADDRESS SIDE DRAWER                                 */}
+      {/* ============================================================ */}
       <div
         className={`address-drawer-overlay ${isAddressDrawerOpen ? 'open' : ''}`}
         onClick={() => setIsAddressDrawerOpen(false)}
@@ -2097,7 +1877,9 @@ const CustomerProfile = ({ defaultTab = 'profile' }) => {
         </div>
       </div>
 
-      {/* ========== REFUND REQUEST MODAL ========== */}
+      {/* ============================================================ */}
+      {/* REFUND REQUEST MODAL                                         */}
+      {/* ============================================================ */}
       <RefundRequestModal
         isOpen={isRefundModalOpen}
         onClose={() => setIsRefundModalOpen(false)}
